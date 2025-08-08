@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for Athena */
+.note-editor {
+  @apply min-h-[400px] p-4 border rounded-lg;
+}
+
+.graph-container {
+  @apply w-full h-full bg-gray-50 dark:bg-gray-900 rounded-lg;
+}
+
+.vault-tree {
+  @apply space-y-1;
+}
+
+.vault-tree-item {
+  @apply px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer;
+}
+
+.chat-message {
+  @apply mb-4 p-3 rounded-lg;
+}
+
+.chat-message.user {
+  @apply bg-blue-100 dark:bg-blue-900 ml-8;
+}
+
+.chat-message.assistant {
+  @apply bg-gray-100 dark:bg-gray-800 mr-8;
+}
+
+.briefing-card {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6;
+}
+
+.task-card {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-4 mb-3;
+}
