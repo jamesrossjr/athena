@@ -1,13 +1,28 @@
 {
-  "name": "nuxt-app",
+  "name": "athena",
+  "version": "0.1.0",
+  "description": "Athena - Knowledge Management and Chat Interface",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "build": "nuxt build",
-    "dev": "HOST=0.0.0.0 nuxt dev",
+    "dev": "nuxt dev",
+    "dev:host": "HOST=0.0.0.0 nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "start": "node .output/server/index.mjs",
+    "start:pm2": "pm2 start ecosystem.config.js",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "docker:build": "docker build -t athena .",
+    "docker:run": "docker run -p 3000:3000 athena"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
@@ -20,5 +35,27 @@
     "lucide-vue-next": "^0.539.0",
     "nuxt": "^3.13.0",
     "pinia": "^3.0.3"
-  }
+  },
+  "devDependencies": {
+    "@iconify-json/heroicons": "^1.2.2",
+    "@nuxt/eslint-config": "^0.2.0",
+    "@vue/test-utils": "^2.4.2",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "jsdom": "^23.0.1",
+    "postcss": "^8.4.32",
+    "tailwindcss": "3.4.17",
+    "typescript": "^5.3.3",
+    "vue-tsc": "^1.8.25"
+  },
+  "keywords": [
+    "nuxt",
+    "vue",
+    "knowledge-management",
+    "chat",
+    "notes",
+    "vault"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
 }

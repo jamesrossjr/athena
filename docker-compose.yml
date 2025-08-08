@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  athena:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=3000
+    env_file:
+      - .env
+    restart: unless-stopped

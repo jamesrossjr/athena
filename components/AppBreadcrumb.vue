@@ -4,16 +4,19 @@
       <li v-for="(item, index) in breadcrumbs" :key="item.path" class="flex items-center">
         <NuxtLink 
           :to="item.path"
-          class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          :class="{ 'text-gray-900 dark:text-white': index === breadcrumbs.length - 1 }"
+          class="text-sm font-mono tracking-wide transition-all duration-200"
+          :class="index === breadcrumbs.length - 1 
+            ? 'text-cyan-400 font-bold' 
+            : 'text-cyan-400/60 hover:text-cyan-400'"
         >
           {{ item.name }}
         </NuxtLink>
-        <Icon 
+        <span 
           v-if="index < breadcrumbs.length - 1"
-          name="heroicons:chevron-right"
-          class="h-4 w-4 text-gray-400 mx-2"
-        />
+          class="mx-2 text-cyan-400/40"
+        >
+          /
+        </span>
       </li>
     </ol>
   </nav>
@@ -24,13 +27,13 @@ const route = useRoute()
 
 const breadcrumbs = computed(() => {
   const pathSegments = route.path.split('/').filter(Boolean)
-  const crumbs = [{ name: 'Home', path: '/' }]
+  const crumbs = [{ name: 'ROOT', path: '/' }]
   
   let currentPath = ''
   pathSegments.forEach(segment => {
     currentPath += `/${segment}`
     crumbs.push({
-      name: segment.charAt(0).toUpperCase() + segment.slice(1),
+      name: segment.toUpperCase().replace(/-/g, '_'),
       path: currentPath
     })
   })
