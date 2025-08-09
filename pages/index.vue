@@ -12,7 +12,7 @@
         v-for="element in elements"
         :key="element.id"
         :data-element-id="element.id"
-        :data-placeholder="element.content === '' ? 'Type here...' : ''"
+        :data-placeholder="''"
         @click.stop="selectElement(element.id)"
         :class="[
           'element-item',
@@ -60,23 +60,28 @@
       :style="{ left: commandMenuPosition.x + 'px', top: commandMenuPosition.y + 'px' }"
     >
       <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1 uppercase tracking-wide">
-        Type command or click to select
+        Commands
       </div>
       <div class="text-xs text-gray-400 dark:text-gray-500 px-2 pb-2">
-        Try: /h1, /h2, /h3, /header1, /header 2, /text, /button... (Option+M to toggle)
+        Try: /h1, /bullet, /quote, /table, /summarize... (Option+M to toggle)
       </div>
-      <button
-        v-for="cmd in availableCommands"
-        :key="cmd.id"
-        @click="executeCommand(cmd)"
-        class="w-full flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"
-      >
-        <div class="text-2xl">{{ cmd.emoji }}</div>
-        <div class="flex-1">
-          <div class="font-medium text-gray-900 dark:text-white">/{{ cmd.id }}</div>
-          <div class="text-sm text-gray-500 dark:text-gray-400">{{ cmd.description }}</div>
+      <div v-for="category in commandCategories" :key="category" class="mb-2">
+        <div v-if="commandsByCategory[category].length > 0" class="text-xs font-medium text-gray-600 dark:text-gray-300 px-2 py-1 border-t border-gray-100 dark:border-gray-600">
+          {{ category }}
         </div>
-      </button>
+        <button
+          v-for="cmd in commandsByCategory[category]"
+          :key="cmd.id"
+          @click="executeCommand(cmd)"
+          class="w-full flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors text-left"
+        >
+          <div class="text-lg">{{ cmd.emoji }}</div>
+          <div class="flex-1">
+            <div class="font-medium text-gray-900 dark:text-white text-sm">/{{ cmd.id }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">{{ cmd.description }}</div>
+          </div>
+        </button>
+      </div>
     </div>
     
     <!-- Style Panel -->
@@ -422,13 +427,43 @@
         <span v-if="isDarkMode" style="fontSize: 12px;">✓</span>
       </button>
       
-      <!-- Sign In -->
-      <button 
-        style="width: 100%; padding: 8px 16px; fontSize: 14px; fontWeight: 500; color: #6b7280; backgroundColor: transparent; border: none; textAlign: left; transition: all 0.2s; cursor: pointer; display: flex; alignItems: center; gap: 8px;"
-      >
-        <span>👤</span>
-        <span>Sign In</span>
-      </button>
+      <!-- User Section -->
+      <div v-if="authStore.isAuthenticated && authStore.user">
+        <!-- User Info -->
+        <div style="width: 100%; padding: 8px 16px; fontSize: 14px; fontWeight: 500; color: #6b7280; display: flex; alignItems: center; gap: 8px;">
+          <div style="width: 24px; height: 24px; borderRadius: 50%; backgroundColor: #3b82f6; color: white; display: flex; alignItems: center; justifyContent: center; fontSize: 12px; fontWeight: bold;">
+            {{ authStore.initials }}
+          </div>
+          <div style="flex: 1; minWidth: 0;">
+            <div style="fontSize: 14px; fontWeight: 500; color: #1f2937; truncate;">
+              {{ authStore.fullName || authStore.user.email }}
+            </div>
+            <div style="fontSize: 12px; color: #6b7280; truncate;">
+              {{ authStore.user.email }}
+            </div>
+          </div>
+        </div>
+        
+        <!-- Sign Out -->
+        <button 
+          @click="handleSignOut"
+          style="width: 100%; padding: 8px 16px; fontSize: 14px; fontWeight: 500; color: #6b7280; backgroundColor: transparent; border: none; textAlign: left; transition: all 0.2s; cursor: pointer; display: flex; alignItems: center; gap: 8px;"
+        >
+          <span>🚪</span>
+          <span>Sign Out</span>
+        </button>
+      </div>
+      
+      <!-- Sign In (for non-authenticated users) -->
+      <div v-else>
+        <button 
+          @click="navigateToAuth"
+          style="width: 100%; padding: 8px 16px; fontSize: 14px; fontWeight: 500; color: #6b7280; backgroundColor: transparent; border: none; textAlign: left; transition: all 0.2s; cursor: pointer; display: flex; alignItems: center; gap: 8px;"
+        >
+          <span>👤</span>
+          <span>Sign In</span>
+        </button>
+      </div>
       
       <!-- Divider -->
       <div style="border-top: 1px solid #e5e7eb;"></div>
@@ -447,6 +482,9 @@
 
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+
+// Authentication
+const authStore = useAuthStore()
 
 // Core Canvas State
 const isTyping = ref(false)
@@ -488,13 +526,29 @@ const selectedElement = computed(() => {
   return elements.value.find(el => el.id === selectedElementId.value)
 })
 
-// Available Commands for Building Elements
+// Command Categories for Menu Grouping
+const commandCategories = computed(() => {
+  const categories = [...new Set(availableCommands.value.map(cmd => cmd.category || 'Other'))]
+  return categories.sort()
+})
+
+const commandsByCategory = computed(() => {
+  const grouped = {}
+  commandCategories.value.forEach(category => {
+    grouped[category] = availableCommands.value.filter(cmd => (cmd.category || 'Other') === category)
+  })
+  return grouped
+})
+
+// Comprehensive Command Registry with Categories & Aliases
 const availableCommands = ref([
   {
     id: 'h1',
     label: 'Heading 1',
     description: 'Large heading (H1)',
+    category: 'Content Blocks',
     emoji: '📝',
+    aliases: ['header1', 'heading1', 'header'],
     defaultContent: '',
     defaultStyles: {
       fontSize: '48px',
@@ -658,6 +712,263 @@ const availableCommands = ref([
       backgroundColor: '#f8fafc',
       borderRadius: '8px',
       minWidth: '600px'
+    }
+  },
+  
+  // Content Blocks - Additional
+  {
+    id: 'bullet',
+    label: 'Bulleted List',
+    description: 'Bulleted list item',
+    category: 'Content Blocks',
+    emoji: '•',
+    aliases: ['ul', 'list'],
+    defaultContent: '• ',
+    defaultStyles: {
+      fontSize: '16px',
+      fontWeight: 'normal',
+      color: '#333333',
+      padding: '4px 8px',
+      paddingLeft: '24px',
+      lineHeight: '1.6'
+    }
+  },
+  {
+    id: 'number',
+    label: 'Numbered List',
+    description: 'Numbered list item',
+    category: 'Content Blocks',
+    emoji: '1️⃣',
+    aliases: ['ol', 'ordered'],
+    defaultContent: '1. ',
+    defaultStyles: {
+      fontSize: '16px',
+      fontWeight: 'normal',
+      color: '#333333',
+      padding: '4px 8px',
+      paddingLeft: '24px',
+      lineHeight: '1.6'
+    }
+  },
+  {
+    id: 'quote',
+    label: 'Quote Block',
+    description: 'Highlighted quote or callout',
+    category: 'Content Blocks',
+    emoji: '💬',
+    aliases: ['blockquote'],
+    defaultContent: '',
+    defaultStyles: {
+      fontSize: '18px',
+      fontWeight: 'normal',
+      color: '#4b5563',
+      backgroundColor: '#f9fafb',
+      padding: '16px',
+      borderLeft: '4px solid #3b82f6',
+      fontStyle: 'italic',
+      lineHeight: '1.6'
+    }
+  },
+  {
+    id: 'code',
+    label: 'Code Block',
+    description: 'Syntax highlighted code',
+    category: 'Content Blocks',
+    emoji: '💻',
+    aliases: ['codeblock'],
+    defaultContent: '',
+    defaultStyles: {
+      fontSize: '14px',
+      fontFamily: 'Monaco, "Lucida Console", monospace',
+      color: '#e5e7eb',
+      backgroundColor: '#1f2937',
+      padding: '16px',
+      borderRadius: '8px',
+      lineHeight: '1.5',
+      whiteSpace: 'pre-wrap'
+    }
+  },
+  {
+    id: 'divider',
+    label: 'Divider',
+    description: 'Horizontal line separator',
+    category: 'Content Blocks',
+    emoji: '➖',
+    aliases: ['hr', 'line'],
+    defaultContent: '',
+    defaultStyles: {
+      width: '100%',
+      height: '1px',
+      backgroundColor: '#d1d5db',
+      margin: '20px 0',
+      border: 'none'
+    }
+  },
+
+  // Structured Data
+  {
+    id: 'table',
+    label: 'Table',
+    description: 'Insert an inline table',
+    category: 'Structured Data',
+    emoji: '📊',
+    aliases: ['grid'],
+    defaultContent: 'Header 1 | Header 2\n--- | ---\nCell 1 | Cell 2',
+    defaultStyles: {
+      fontSize: '14px',
+      color: '#374151',
+      border: '1px solid #d1d5db',
+      borderRadius: '8px',
+      padding: '12px',
+      backgroundColor: '#ffffff',
+      fontFamily: 'monospace',
+      whiteSpace: 'pre'
+    }
+  },
+  {
+    id: 'kanban',
+    label: 'Kanban Board',
+    description: 'Project board with columns',
+    category: 'Structured Data',
+    emoji: '📋',
+    aliases: ['board'],
+    defaultContent: '📋 Kanban Board\n\nTo Do | In Progress | Done',
+    defaultStyles: {
+      fontSize: '16px',
+      color: '#374151',
+      width: '100%',
+      minHeight: '300px',
+      border: '1px solid #d1d5db',
+      borderRadius: '12px',
+      padding: '20px',
+      backgroundColor: '#f9fafb'
+    }
+  },
+
+  // AI Actions
+  {
+    id: 'summarize',
+    label: 'AI Summarize',
+    description: 'Summarize selected content',
+    category: 'AI Actions',
+    emoji: '🤖',
+    aliases: ['summary'],
+    defaultContent: '🤖 AI Summary will appear here...',
+    defaultStyles: {
+      fontSize: '16px',
+      color: '#1f2937',
+      backgroundColor: '#ecfdf5',
+      padding: '16px',
+      borderRadius: '8px',
+      border: '1px solid #10b981'
+    }
+  },
+  {
+    id: 'ask',
+    label: 'Ask AI',
+    description: 'Ask AI a question in context',
+    category: 'AI Actions',
+    emoji: '❓',
+    aliases: ['question'],
+    defaultContent: '❓ What would you like to know?',
+    defaultStyles: {
+      fontSize: '16px',
+      color: '#1f2937',
+      backgroundColor: '#eff6ff',
+      padding: '16px',
+      borderRadius: '8px',
+      border: '1px solid #3b82f6'
+    }
+  },
+  {
+    id: 'brainstorm',
+    label: 'AI Brainstorm',
+    description: 'Generate ideas based on current selection',
+    category: 'AI Actions',
+    emoji: '💡',
+    aliases: ['ideas'],
+    defaultContent: '💡 AI brainstorming ideas...',
+    defaultStyles: {
+      fontSize: '16px',
+      color: '#1f2937',
+      backgroundColor: '#fef3c7',
+      padding: '16px',
+      borderRadius: '8px',
+      border: '1px solid #f59e0b'
+    }
+  },
+  {
+    id: 'improve',
+    label: 'Improve Writing',
+    description: 'Rewrite content for clarity',
+    category: 'AI Actions',
+    emoji: '✨',
+    aliases: ['rewrite'],
+    defaultContent: '✨ Improved content will appear here...',
+    defaultStyles: {
+      fontSize: '16px',
+      color: '#1f2937',
+      backgroundColor: '#f0f9ff',
+      padding: '16px',
+      borderRadius: '8px',
+      border: '1px solid #0ea5e9'
+    }
+  },
+
+  // Project Management
+  {
+    id: 'task',
+    label: 'Task Item',
+    description: 'Create a task with checkbox',
+    category: 'Project Management',
+    emoji: '☐',
+    aliases: ['todo', 'checkbox'],
+    defaultContent: '☐ ',
+    defaultStyles: {
+      fontSize: '16px',
+      color: '#374151',
+      padding: '8px',
+      paddingLeft: '32px',
+      lineHeight: '1.6'
+    }
+  },
+
+  // Media & Embeds
+  {
+    id: 'image',
+    label: 'Image',
+    description: 'Upload or embed image',
+    category: 'Media & Embeds',
+    emoji: '🖼️',
+    aliases: ['img', 'picture'],
+    defaultContent: '🖼️ [Image placeholder - drag & drop or paste]',
+    defaultStyles: {
+      fontSize: '14px',
+      color: '#6b7280',
+      backgroundColor: '#f9fafb',
+      padding: '40px',
+      borderRadius: '8px',
+      border: '2px dashed #d1d5db',
+      textAlign: 'center',
+      minHeight: '200px'
+    }
+  },
+  {
+    id: 'video',
+    label: 'Video Embed',
+    description: 'Embed video content',
+    category: 'Media & Embeds',
+    emoji: '🎥',
+    aliases: ['vid'],
+    defaultContent: '🎥 [Video embed placeholder]',
+    defaultStyles: {
+      fontSize: '14px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: '60px',
+      borderRadius: '8px',
+      textAlign: 'center',
+      minHeight: '300px'
     }
   }
 ])
@@ -895,38 +1206,28 @@ const handleElementKeydown = (e, elementId) => {
 
 // Command parsing helper
 const parseSlashCommand = (text) => {
-  const commands = {
-    '/header1': 'h1',
-    '/header 1': 'h1',
-    '/h1': 'h1',
-    '/header2': 'h2',
-    '/header 2': 'h2',
-    '/h2': 'h2',
-    '/header3': 'h3',
-    '/header 3': 'h3',
-    '/h3': 'h3',
-    '/header4': 'h4',
-    '/header 4': 'h4',
-    '/h4': 'h4',
-    '/header5': 'h5',
-    '/header 5': 'h5',
-    '/h5': 'h5',
-    '/heading': 'h1',      // default to h1
-    '/header': 'h1',       // default to h1
-    '/text': 'text',
-    '/p': 'text',          // alias for text
-    '/button': 'button',
-    '/btn': 'button',      // alias for button
-    '/menu': 'menu',
-    '/card': 'card',
-    '/footer': 'footer',
-    '/chart': 'chart',
-    '/grid': 'grid'
-  }
+  // Build dynamic command map from availableCommands with aliases
+  const commands = {}
+  
+  availableCommands.value.forEach(cmd => {
+    // Add primary command
+    commands[`/${cmd.id}`] = cmd.id
+    
+    // Add aliases if they exist
+    if (cmd.aliases) {
+      cmd.aliases.forEach(alias => {
+        commands[`/${alias}`] = cmd.id
+      })
+    }
+  })
+  
+  // Debug: Log available commands
+  console.log('Available commands:', Object.keys(commands).slice(0, 10))
   
   for (const [command, type] of Object.entries(commands)) {
     if (text.toLowerCase().includes(command)) {
       const content = text.replace(new RegExp(command, 'i'), '').trim()
+      console.log('Matched command:', command, 'Type:', type)
       return { type, content: content || null }
     }
   }
@@ -1206,8 +1507,22 @@ watch(elements, (newElements) => {
   }
 }, { deep: true })
 
-// Initialize first page from current workspace
-onMounted(() => {
+// Authentication methods
+const navigateToAuth = () => {
+  navigateTo('/auth/login')
+}
+
+const handleSignOut = async () => {
+  await authStore.logout()
+}
+
+// Initialize authentication and first page
+onMounted(async () => {
+  // Fetch current user if authenticated
+  if (!authStore.user) {
+    await authStore.fetchUser()
+  }
+  
   if (currentWorkspace.value && currentWorkspace.value.pages.length > 0) {
     const firstPage = currentWorkspace.value.pages[0]
     currentPageId.value = firstPage.id
@@ -1239,11 +1554,7 @@ onMounted(() => {
   min-height: 1.5em; /* Ensure empty elements are visible */
 }
 
-.element-item:empty::before {
-  content: attr(data-placeholder);
-  color: #d1d5db;
-  pointer-events: none;
-}
+/* Removed placeholder text - clean paper experience */
 
 .element-item:hover {
   /* No automatic borders - only if user adds them */

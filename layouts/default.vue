@@ -1,9 +1,12 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
     <slot />
+    
+    <!-- Global Command Palette -->
+    <CommandPalette :is-open="isCommandPaletteOpen" @close="closeCommandPalette" />
   </div>
 </template>
 
 <script setup>
-// Simple, clean layout wrapper
+const { isOpen: isCommandPaletteOpen, close: closeCommandPalette } = useCommandPalette()
 </script>
