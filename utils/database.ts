@@ -1,5 +1,5 @@
+
 import { PrismaClient } from '@prisma/client'
-import { supabase } from './supabase'
 
 declare global {
   var __prisma: PrismaClient | undefined
@@ -16,4 +16,4 @@ if (process.env.NODE_ENV === 'production') {
   prisma = globalThis.__prisma
 }
 
-export { prisma, supabase }
+export { prisma }

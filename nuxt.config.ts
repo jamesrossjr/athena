@@ -27,6 +27,9 @@ export default defineNuxtConfig({
     preset: 'node-server',
     minify: true,
     compressPublicAssets: true,
+    experimental: {
+      wasm: true
+    },
     routeRules: {
       '/**': {
         headers: {
@@ -70,6 +73,7 @@ export default defineNuxtConfig({
   vite: {
     build: {
       rollupOptions: {
+        external: ['@prisma/client'],
         output: {
           manualChunks: {
             vendor: ['vue', '@headlessui/vue', '@heroicons/vue'],

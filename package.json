@@ -38,11 +38,14 @@
     "@types/nodemailer": "^6.4.17",
     "@vueuse/nuxt": "^13.6.0",
     "argon2": "^0.43.1",
+    "formidable": "^3.5.1",
     "google-auth-library": "^10.2.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-vue-next": "^0.539.0",
+    "marked": "^16.1.2",
     "nodemailer": "^7.0.5",
     "nuxt": "^3.13.0",
+    "pdfjs-dist": "^4.0.269",
     "pinia": "^3.0.3",
     "prisma": "^6.13.0",
     "zod": "^4.0.16"
@@ -50,6 +53,7 @@
   "devDependencies": {
     "@iconify-json/heroicons": "^1.2.2",
     "@nuxt/eslint-config": "^0.2.0",
+    "@types/formidable": "^3.4.5",
     "@vue/test-utils": "^2.4.2",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.55.0",
@@ -57,7 +61,7 @@
     "postcss": "^8.4.32",
     "tailwindcss": "3.4.17",
     "typescript": "^5.3.3",
-    "vue-tsc": "^1.8.25"
+    "vue-tsc": "^3.0.5"
   },
   "keywords": [
     "nuxt",

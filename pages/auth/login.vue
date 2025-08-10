@@ -7,6 +7,14 @@
         <span class="typewriter-text"> to Paper</span>
         <span v-if="!welcomeComplete" class="typewriter-cursor">▋</span>
       </h1>
+      <div v-if="welcomeComplete" class="mt-4 text-center">
+        <button 
+          @click="toggleMode" 
+          class="text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200 underline"
+        >
+          {{ isSignupMode ? 'Already have an account? Sign in' : 'Need an account? Sign up' }}
+        </button>
+      </div>
     </div>
 
     <!-- Main Container - Center of Page -->
@@ -36,12 +44,61 @@
 
         <!-- Login Form Container -->
         <div style="max-width: 500px; margin-left: auto; margin-right: auto; background-color: #F9F9F9; padding: 30px; border-radius: 8px;">
-          <!-- Login Label -->
+          
+          <!-- First Name (Signup only) -->
+          <template v-if="isSignupMode">
+            <div v-if="showLogin" class="mb-2 transition-opacity duration-1000" :class="{ 'opacity-100': loginComplete, 'opacity-0': !loginComplete }">
+              <span class="typewriter-text text-xl">first name:</span>
+            </div>
+            <div v-if="showLogin" class="mb-6 transition-opacity duration-1000" :class="{ 'opacity-100': loginComplete, 'opacity-0': !loginComplete }">
+              <input
+                id="firstName"
+                v-model="state.firstName"
+                type="text"
+                :disabled="isLoading"
+                aria-label="Enter your first name"
+                :class="[
+                  'w-full px-3 py-3 bg-white border-0 focus:outline-none focus:border-2 transition-all duration-300 text-lg rounded-md',
+                  validationErrors.firstName ? 'focus:border-red-500 border-2 border-red-500' : 'focus:border-blue-500'
+                ]"
+                placeholder=""
+                @blur="validateForm"
+              />
+              <div v-if="validationErrors.firstName" class="mt-1 text-sm text-red-600">
+                {{ validationErrors.firstName }}
+              </div>
+            </div>
+
+            <!-- Last Name (Signup only) -->
+            <div v-if="showLogin" class="mb-2 transition-opacity duration-1000" :class="{ 'opacity-100': loginComplete, 'opacity-0': !loginComplete }">
+              <span class="typewriter-text text-xl">last name:</span>
+            </div>
+            <div v-if="showLogin" class="mb-6 transition-opacity duration-1000" :class="{ 'opacity-100': loginComplete, 'opacity-0': !loginComplete }">
+              <input
+                id="lastName"
+                v-model="state.lastName"
+                type="text"
+                :disabled="isLoading"
+                aria-label="Enter your last name"
+                :class="[
+                  'w-full px-3 py-3 bg-white border-0 focus:outline-none focus:border-2 transition-all duration-300 text-lg rounded-md',
+                  validationErrors.lastName ? 'focus:border-red-500 border-2 border-red-500' : 'focus:border-blue-500'
+                ]"
+                placeholder=""
+                @blur="validateForm"
+              />
+              <div v-if="validationErrors.lastName" class="mt-1 text-sm text-red-600">
+                {{ validationErrors.lastName }}
+              </div>
+            </div>
+          </template>
+
+          <!-- Email Label -->
           <div v-if="showLogin" class="mb-2 transition-opacity duration-1000" :class="{ 'opacity-100': loginComplete, 'opacity-0': !loginComplete }">
-            <span class="typewriter-text text-xl">login:</span>
+            <span class="typewriter-text text-xl">{{ isSignupMode ? 'email:' : 'login:' }}</span>
           </div>
           
-          <!-- Login Input -->
+          <!-- Email Input -->
           <div v-if="showLogin" class="mb-6 transition-opacity duration-1000" :class="{ 'opacity-100': loginComplete, 'opacity-0': !loginComplete }">
             <input
               id="login"
@@ -83,16 +140,66 @@
                 validationErrors.password ? 'focus:border-red-500 border-2 border-red-500' : 'focus:border-blue-500'
               ]"
               placeholder=""
-              @keyup.enter="onSubmit"
+              @keyup.enter="!isSignupMode ? onSubmit() : undefined"
               @blur="validateForm"
             />
             <div v-if="validationErrors.password" class="mt-1 text-sm text-red-600">
               {{ validationErrors.password }}
             </div>
+            <!-- Password requirements for signup -->
+            <div v-if="isSignupMode && state.password" class="mt-2 text-xs text-gray-600 space-y-1">
+              <div class="grid grid-cols-1 gap-1">
+                <span :class="passwordChecks.length ? 'text-green-600' : 'text-gray-400'">
+                  ✓ At least 12 characters
+                </span>
+                <span :class="passwordChecks.uppercase ? 'text-green-600' : 'text-gray-400'">
+                  ✓ One uppercase letter
+                </span>
+                <span :class="passwordChecks.lowercase ? 'text-green-600' : 'text-gray-400'">
+                  ✓ One lowercase letter
+                </span>
+                <span :class="passwordChecks.number ? 'text-green-600' : 'text-gray-400'">
+                  ✓ One number
+                </span>
+                <span :class="passwordChecks.special ? 'text-green-600' : 'text-gray-400'">
+                  ✓ One special character
+                </span>
+              </div>
+            </div>
           </div>
 
-          <!-- Remember Me and Forgot Password -->
-          <div v-if="showFields" class="flex justify-between items-center mb-8 transition-opacity duration-1000" :class="{ 'opacity-100': showFields, 'opacity-0': !showFields }">
+          <!-- Confirm Password (Signup only) -->
+          <template v-if="isSignupMode">
+            <div v-if="showPasswordPrompt" class="mb-2 transition-opacity duration-1000" :class="{ 'opacity-100': passwordPromptComplete, 'opacity-0': !passwordPromptComplete }">
+              <span class="typewriter-text text-xl">confirm password:</span>
+            </div>
+            <div v-if="showPasswordPrompt" class="mb-8 transition-opacity duration-1000" :class="{ 'opacity-100': passwordPromptComplete, 'opacity-0': !passwordPromptComplete }">
+              <input
+                id="passwordConfirmation"
+                v-model="state.passwordConfirmation"
+                type="password"
+                required
+                :disabled="isLoading"
+                aria-label="Confirm your password"
+                :class="[
+                  'w-full px-3 py-3 bg-white border-0 focus:outline-none focus:border-2 transition-all duration-300 text-lg rounded-md',
+                  validationErrors.passwordConfirmation ? 'focus:border-red-500 border-2 border-red-500' : 'focus:border-blue-500'
+                ]"
+                placeholder=""
+                @keyup.enter="onSubmit"
+                @blur="validateForm"
+              />
+              <div v-if="validationErrors.passwordConfirmation" class="mt-1 text-sm text-red-600">
+                {{ validationErrors.passwordConfirmation }}
+              </div>
+              <div v-if="state.passwordConfirmation && !passwordsMatch" class="mt-1 text-sm text-red-600">
+                Passwords don't match
+              </div>
+            </div>
+          </template>
+
+          <!-- Remember Me and Forgot Password (Login only) -->
+          <div v-if="showFields && !isSignupMode" class="flex justify-between items-center mb-8 transition-opacity duration-1000" :class="{ 'opacity-100': showFields, 'opacity-0': !showFields }">
             <!-- Remember Me Checkbox -->
             <label class="flex items-center cursor-pointer">
               <input
@@ -114,23 +221,23 @@
             <hr class="border-t border-gray-300" />
           </div>
 
-          <!-- Primary Login Button -->
+          <!-- Primary Action Button -->
           <div v-if="showFields" class="mb-8 transition-opacity duration-1000" :class="{ 'opacity-100': showFields, 'opacity-0': !showFields }">
             <button
               type="button"
               @click="onSubmit"
-              :disabled="isLoading || !state.email || !state.password"
-              aria-label="Sign in to your account"
+              :disabled="isLoading || !isFormValid"
+              :aria-label="isSignupMode ? 'Create your account' : 'Sign in to your account'"
               class="w-full py-4 bg-black hover:bg-gray-900 focus:bg-gray-900 border-0 text-white font-bold rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-75 disabled:cursor-not-allowed transition-all duration-300 text-lg shadow-lg"
             >
-              <span v-if="!isLoading">Login</span>
-              <span v-else>Authenticating...</span>
+              <span v-if="!isLoading">{{ isSignupMode ? 'Create Account' : 'Login' }}</span>
+              <span v-else>{{ isSignupMode ? 'Creating Account...' : 'Authenticating...' }}</span>
             </button>
           </div>
 
           <!-- Social Login -->
           <div v-if="showFields" class="mb-8 text-center transition-opacity duration-1000" :class="{ 'opacity-100': showFields, 'opacity-0': !showFields }">
-            <p class="text-sm text-gray-600 mb-4">Sign in with</p>
+            <p class="text-sm text-gray-600 mb-4">{{ isSignupMode ? 'Sign up with' : 'Sign in with' }}</p>
             <div class="flex justify-center gap-6">
               <!-- Google -->
               <button @click="signInWithGoogle" :class="['bg-transparent border-0 outline-none focus:outline-none p-2 transition-transform', shakeGoogle ? 'animate-shake' : '']">
@@ -162,7 +269,7 @@
 
 <script setup lang="ts">
 import { reactive, nextTick } from 'vue'
-import { loginSchema, type LoginInput } from '~/utils/validation'
+import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from '~/utils/validation'
 
 definePageMeta({
   middleware: 'guest',
@@ -176,6 +283,7 @@ const error = ref<string | null>(null)
 const success = ref<string | null>(null)
 const validationErrors = ref<Record<string, string>>({})
 const shakeGoogle = ref(false)
+const isSignupMode = ref(false)
 
 // Animation state
 const showWelcome = ref(false)
@@ -201,7 +309,10 @@ const passwordInput = ref<HTMLInputElement>()
 const state = reactive({
   email: '',
   password: '',
-  remember: false
+  remember: false,
+  firstName: '',
+  lastName: '',
+  passwordConfirmation: ''
 })
 
 // Get success message from route query
@@ -214,6 +325,50 @@ onMounted(() => {
   // Start typewriter animation
   startTypewriterAnimation()
 })
+
+// Computed properties for signup
+const passwordChecks = computed(() => ({
+  length: state.password.length >= 12,
+  uppercase: /[A-Z]/.test(state.password),
+  lowercase: /[a-z]/.test(state.password),
+  number: /\d/.test(state.password),
+  special: /[!@#$%^&*(),.?":{}|<>]/.test(state.password)
+}))
+
+const passwordsMatch = computed(() => {
+  return state.password === state.passwordConfirmation
+})
+
+const isFormValid = computed(() => {
+  if (isSignupMode.value) {
+    return (
+      state.email &&
+      state.password &&
+      state.passwordConfirmation &&
+      passwordChecks.value.length &&
+      passwordChecks.value.uppercase &&
+      passwordChecks.value.lowercase &&
+      passwordChecks.value.number &&
+      passwordChecks.value.special &&
+      passwordsMatch.value
+    )
+  } else {
+    return state.email && state.password
+  }
+})
+
+// Toggle between login and signup modes
+function toggleMode() {
+  isSignupMode.value = !isSignupMode.value
+  // Clear form data when switching modes
+  state.firstName = ''
+  state.lastName = ''
+  state.passwordConfirmation = ''
+  state.remember = false
+  validationErrors.value = {}
+  error.value = null
+  success.value = null
+}
 
 // Animation sequence
 async function startTypewriterAnimation() {
@@ -268,13 +423,25 @@ function validateForm(): boolean {
   validationErrors.value = {}
   
   try {
-    const formData: LoginInput = {
-      email: state.email,
-      password: state.password,
-      rememberMe: state.remember
+    if (isSignupMode.value) {
+      const formData: RegisterInput = {
+        email: state.email,
+        password: state.password,
+        passwordConfirmation: state.passwordConfirmation,
+        firstName: state.firstName,
+        lastName: state.lastName
+      }
+      
+      registerSchema.parse(formData)
+    } else {
+      const formData: LoginInput = {
+        email: state.email,
+        password: state.password,
+        rememberMe: state.remember
+      }
+      
+      loginSchema.parse(formData)
     }
-    
-    loginSchema.parse(formData)
     return true
   } catch (err: any) {
     if (err.errors) {
@@ -302,35 +469,54 @@ async function onSubmit() {
   isLoading.value = true
 
   try {
-    const formData = {
-      email: state.email,
-      password: state.password,
-      rememberMe: state.remember
+    if (isSignupMode.value) {
+      // Handle signup
+      const formData = {
+        email: state.email,
+        password: state.password,
+        passwordConfirmation: state.passwordConfirmation,
+        firstName: state.firstName,
+        lastName: state.lastName
+      }
+      
+      await authStore.register(formData)
+      
+      // Success feedback
+      success.value = 'Account created successfully! Redirecting...'
+    } else {
+      // Handle login
+      const formData = {
+        email: state.email,
+        password: state.password,
+        rememberMe: state.remember
+      }
+      
+      await authStore.login(formData)
+      
+      // Success feedback
+      success.value = 'Login successful! Redirecting...'
     }
-    
-    await authStore.login(formData)
-    
-    // Success feedback
-    success.value = 'Login successful! Redirecting...'
     
     // Redirect after short delay to show success message
     setTimeout(() => {
       navigateTo('/')
     }, 1500)
   } catch (err: any) {
-    console.error('Login error:', err)
+    console.error(`${isSignupMode.value ? 'Signup' : 'Login'} error:`, err)
     
     // Handle different types of errors
     if (err.statusCode === 401) {
       error.value = 'Invalid email or password. Please check your credentials and try again.'
     } else if (err.statusCode === 400) {
       error.value = 'Please check your input and try again.'
+    } else if (err.statusCode === 409) {
+      error.value = 'An account with this email already exists. Please sign in instead.'
     } else if (err.statusCode === 429) {
-      error.value = 'Too many login attempts. Please try again later.'
+      error.value = `Too many ${isSignupMode.value ? 'signup' : 'login'} attempts. Please try again later.`
     } else if (err.statusCode >= 500) {
       error.value = 'Server error. Please try again later.'
     } else {
-      error.value = err.data?.statusMessage || err.message || 'An unexpected error occurred. Please try again.'
+      error.value = err.data?.statusMessage || err.message || `An unexpected error occurred during ${isSignupMode.value ? 'signup' : 'login'}. Please try again.`
     }
   } finally {
     isLoading.value = false

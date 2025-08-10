@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="h-screen w-screen overflow-hidden m-0 p-0">
     <slot />
     
     <!-- Global Command Palette -->

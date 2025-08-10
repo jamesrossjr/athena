@@ -47,9 +47,14 @@ export const useAuthStore = defineStore('auth', {
           this.user = null
           this.isAuthenticated = false
         }
-      } catch (error) {
+      } catch (error: any) {
         this.user = null
         this.isAuthenticated = false
+        
+        // Don't log 401 errors as they're expected when not authenticated
+        if (error?.response?.status !== 401 && error?.status !== 401) {
+          console.error('Fetch user error:', error)
+        }
       } finally {
         this.isLoading = false
       }

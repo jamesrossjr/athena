@@ -77,3 +77,12 @@ jspm_packages/
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 /generated/prisma
+
+# Uploaded files
+uploads/
+
+# Database
+*.db
+*.db-journal
+dev.db
+dev.db-journal
