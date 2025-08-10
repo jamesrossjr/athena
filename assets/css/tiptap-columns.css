@@ -1,0 +1,368 @@
+/* TipTap Column System Styles */
+
+/* Base Column Container - High specificity to override other styles */
+.column-container,
+.ProseMirror .column-container,
+div[data-type="column-container"] {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 1rem !important;
+  padding: 1rem !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid transparent !important;
+  transition: all 0.2s ease !important;
+  margin: 1rem 0 !important;
+}
+
+.column-container:hover,
+.ProseMirror .column-container:hover,
+div[data-type="column-container"]:hover {
+  border-color: rgb(229, 231, 235) !important;
+}
+
+.dark .column-container:hover {
+  border-color: rgb(75, 85, 99) !important;
+}
+
+/* Individual Columns - High specificity */
+.column,
+.ProseMirror .column,
+div[data-type="column"] {
+  flex: 1 !important;
+  min-width: 0 !important;
+  padding: 0.75rem !important;
+  border-radius: 0.375rem !important;
+  border-left: 2px solid transparent !important;
+  transition: all 0.2s ease !important;
+  background-color: rgba(249, 250, 251, 0.5) !important;
+}
+
+.column:hover,
+.ProseMirror .column:hover,
+div[data-type="column"]:hover {
+  border-left-color: rgb(229, 231, 235) !important;
+}
+
+.column:focus-within,
+.ProseMirror .column:focus-within,
+div[data-type="column"]:focus-within {
+  border-left-color: rgb(147, 197, 253) !important;
+  background-color: rgba(219, 234, 254, 0.5) !important;
+}
+
+.dark .column:hover {
+  border-left-color: rgb(75, 85, 99) !important;
+}
+
+.dark .column:focus-within {
+  border-left-color: rgb(59, 130, 246) !important;
+  background-color: rgba(30, 64, 175, 0.1) !important;
+}
+
+/* Column content should have proper spacing */
+.column > * {
+  margin-bottom: 0.75rem;
+}
+
+.column > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Mobile responsive behavior */
+@media (max-width: 768px) {
+  .column-container,
+  .ProseMirror .column-container,
+  div[data-type="column-container"] {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    padding: 0.5rem !important;
+  }
+  
+  .column,
+  .ProseMirror .column,
+  div[data-type="column"] {
+    width: 100% !important;
+    min-width: 100% !important;
+    border-left: none !important;
+    border-top: 2px solid transparent !important;
+    padding-top: 0.75rem !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  .column:first-child,
+  .ProseMirror .column:first-child,
+  div[data-type="column"]:first-child {
+    border-top: none !important;
+    padding-top: 0 !important;
+  }
+}
+
+/* Column Controls Overlay */
+.column-controls {
+  position: absolute;
+  top: -2.5rem;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: white;
+  border: 1px solid rgb(229, 231, 235);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  z-index: 10;
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 200ms;
+}
+
+.column-container-wrapper:hover .column-controls {
+  opacity: 1;
+}
+
+.dark .column-controls {
+  background-color: rgb(31, 41, 55);
+  border-color: rgb(75, 85, 99);
+}
+
+/* Drag Handles */
+.column-drag-handle {
+  position: absolute;
+  top: -1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2rem;
+  height: 1rem;
+  background-color: rgb(229, 231, 235);
+  border-radius: 0.25rem;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  opacity: 0;
+  transition-property: all;
+  transition-duration: 200ms;
+}
+
+.column-drag-handle:hover {
+  background-color: rgb(209, 213, 219);
+}
+
+.column-drag-handle:active {
+  cursor: grabbing;
+}
+
+.column-wrapper:hover .column-drag-handle {
+  opacity: 1;
+}
+
+.column-drag-handle:active {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translate(-50%, -2px) scale(1.05);
+}
+
+.dark .column-drag-handle {
+  background-color: rgb(75, 85, 99);
+}
+
+.dark .column-drag-handle:hover {
+  background-color: rgb(107, 114, 128);
+}
+
+/* Hide drag handles on mobile */
+@media (max-width: 768px) {
+  .column-drag-handle {
+    display: none;
+  }
+}
+
+/* Drop Indicators */
+.column-drop-indicator {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed rgb(59, 130, 246);
+  background-color: rgb(239, 246, 255);
+  border-radius: 0.5rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dark .column-drop-indicator {
+  background-color: rgba(30, 64, 175, 0.2);
+}
+
+/* Empty column placeholder */
+.column:empty::before {
+  content: 'Start typing...';
+  color: rgb(156, 163, 175);
+  font-style: italic;
+}
+
+.dark .column:empty::before {
+  color: rgb(107, 114, 128);
+}
+
+/* Selection and focus styles */
+.column-container:focus-within {
+  border-color: rgb(147, 197, 253);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.dark .column-container:focus-within {
+  border-color: rgb(59, 130, 246);
+}
+
+/* Animation for column creation */
+@keyframes columnCreate {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.column-container {
+  animation: columnCreate 0.2s ease-out;
+}
+
+/* Ensure proper text flow in columns */
+.column .ProseMirror {
+  outline: none;
+  min-height: 2rem;
+}
+
+.column .ProseMirror p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.column .ProseMirror p:first-child {
+  margin-top: 0;
+}
+
+.column .ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+/* Headings in columns */
+.column .ProseMirror h1,
+.column .ProseMirror h2,
+.column .ProseMirror h3,
+.column .ProseMirror h4,
+.column .ProseMirror h5,
+.column .ProseMirror h6 {
+  margin-bottom: 0.5rem;
+  margin-top: 1rem;
+}
+
+.column .ProseMirror h1:first-child,
+.column .ProseMirror h2:first-child,
+.column .ProseMirror h3:first-child,
+.column .ProseMirror h4:first-child,
+.column .ProseMirror h5:first-child,
+.column .ProseMirror h6:first-child {
+  margin-top: 0;
+}
+
+/* Lists in columns */
+.column .ProseMirror ul,
+.column .ProseMirror ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.column .ProseMirror li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Code blocks in columns */
+.column .ProseMirror pre {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background-color: rgb(243, 244, 246);
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  overflow-x: auto;
+}
+
+.dark .column .ProseMirror pre {
+  background-color: rgb(31, 41, 55);
+}
+
+/* Blockquotes in columns */
+.column .ProseMirror blockquote {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1rem;
+  border-left: 4px solid rgb(209, 213, 219);
+  font-style: italic;
+}
+
+.dark .column .ProseMirror blockquote {
+  border-left-color: rgb(75, 85, 99);
+}
+
+/* Tables in columns (if needed) */
+.column .ProseMirror table {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.column .ProseMirror td,
+.column .ProseMirror th {
+  border: 1px solid rgb(229, 231, 235);
+  padding: 0.5rem;
+}
+
+.dark .column .ProseMirror td,
+.dark .column .ProseMirror th {
+  border-color: rgb(55, 65, 81);
+}
+
+/* Images in columns */
+.column .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.25rem;
+}
+
+/* Print styles */
+@media print {
+  .column-controls,
+  .column-drag-handle {
+    display: none;
+  }
+  
+  .column-container {
+    flex-direction: row;
+    border: none;
+    box-shadow: none;
+  }
+  
+  .column {
+    border-right: 1px solid rgb(209, 213, 219);
+    padding-right: 1rem;
+  }
+  
+  .column:last-child {
+    border-right: none;
+    padding-right: 0;
+  }
+}

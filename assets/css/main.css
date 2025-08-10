@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import TipTap column system styles */
+@import './tiptap-columns.css';
+
 /* Aggressive Reset for Edge-to-Edge Layout */
 * {
   box-sizing: border-box;

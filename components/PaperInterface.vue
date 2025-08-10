@@ -24,7 +24,7 @@
             Create a new document or open one from your workspace
           </p>
           <div class="paper-empty__actions">
-            <button @click="createNewDocument('page')" class="paper-button paper-button--primary">
+            <button @click="showTemplatePickerModal" class="paper-button paper-button--primary">
               New Page
             </button>
             <button @click="showDocumentPicker" class="paper-button">
@@ -121,6 +121,11 @@
                 <span class="new-doc-icon">📝</span>
                 <span class="new-doc-label">Page</span>
               </div>
+              <div class="new-document-item" @click="showTemplatePickerFromMenu">
+                <span class="new-doc-icon">📋</span>
+                <span class="new-doc-label">Page from Template</span>
+              </div>
+              <div class="new-doc-divider"></div>
               <div class="new-document-item" @click="createNewDocument('table')">
                 <span class="new-doc-icon">📊</span>
                 <span class="new-doc-label">Table</span>
@@ -261,6 +266,7 @@
       <div 
         class="slash-command-menu" 
         @click.stop
+        tabindex="-1"
         :style="{ 
           left: slashCommandPosition.x + 'px', 
           top: slashCommandPosition.y + 'px' 
@@ -303,9 +309,30 @@
         }"
       >
         <div class="type-changer-header">
-          <span>Change Document Type</span>
+          <span>Document Options</span>
         </div>
         <div class="type-changer-list">
+          <!-- Save as Template Option -->
+          <div
+            @click="saveAsTemplate"
+            class="type-changer-item template-option"
+          >
+            <span class="type-icon">📋</span>
+            <div class="type-info">
+              <span class="type-title">Save as Template</span>
+              <span class="type-description">Save this document as a reusable template</span>
+            </div>
+          </div>
+          
+          <!-- Divider -->
+          <div class="type-changer-divider"></div>
+          
+          <!-- Change Type Header -->
+          <div class="type-changer-subheader">
+            <span>Change Document Type</span>
+          </div>
+          
+          <!-- Document Types -->
           <div
             v-for="docType in documentTypes"
             :key="docType.type"
@@ -323,17 +350,84 @@
       </div>
     </div>
     
+    <!-- Template Picker Modal -->
+    <div
+      v-if="showTemplatePicker"
+      class="template-picker-overlay"
+      @click="closeTemplatePicker"
+    >
+      <div class="template-picker-modal" @click.stop>
+        <div class="template-picker-header">
+          <h3>Choose a Template</h3>
+          <button @click="closeTemplatePicker" class="close-btn">×</button>
+        </div>
+        
+        <div class="template-picker-content">
+          <!-- Blank Document Option -->
+          <div class="template-section">
+            <h4>Start Fresh</h4>
+            <div 
+              @click="createBlankDocument"
+              class="template-item template-item--blank"
+            >
+              <div class="template-icon">📝</div>
+              <div class="template-info">
+                <span class="template-title">Blank Page</span>
+                <span class="template-description">Start with an empty document</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Templates Section -->
+          <div v-if="availableTemplates.length > 0" class="template-section">
+            <h4>Templates</h4>
+            <div class="template-grid">
+              <div
+                v-for="template in availableTemplates"
+                :key="template.id"
+                @click="applyTemplate(template)"
+                class="template-item"
+              >
+                <div class="template-icon">📋</div>
+                <div class="template-info">
+                  <span class="template-title">{{ template.name }}</span>
+                  <span class="template-description">{{ formatDate(template.createdAt) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- No Templates Message -->
+          <div v-else class="template-section">
+            <div class="no-templates">
+              <div class="no-templates-icon">📋</div>
+              <p>No templates saved yet</p>
+              <p class="no-templates-hint">Right-click on any document and select "Save as template" to create your first template</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Help & Commands Modal -->
+    <HelpCommandsModal
+      :is-open="showHelpModal"
+      @close="showHelpModal = false"
+    />
+    
     <!-- Click outside overlay -->
     <div v-if="showWorkspaceMenu || showAppMenu || showNewDocumentMenu" class="overlay" @click="closeOverlays"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useWorkspaceStore } from '~/stores/workspace'
+import { usePageLinks } from '~/composables/usePageLinks'
 import TileLayout from './TileLayout.vue'
 import DocumentRenderer from './DocumentRenderer.vue'
 import PdfImporter from './PdfImporter.vue'
+import HelpCommandsModal from './HelpCommandsModal.vue'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -353,6 +447,9 @@ const documentRenderer = ref(null)
 const showTypeChanger = ref(false)
 const typeChangerPosition = ref({ x: 0, y: 0 })
 const selectedDocument = ref<any>(null)
+const showTemplatePicker = ref(false)
+const availableTemplates = ref<any[]>([])
+const showHelpModal = ref(false)
 
 // Tab scrolling
 const tabBar = ref<HTMLElement>()
@@ -510,9 +607,19 @@ function moveTabToPane(tabId: string, paneId: string) {
 }
 
 function updateDocument(updatedDoc: any) {
-  if (activeDocument.value) {
+  if (activeDocument.value && activeWorkspace.value) {
     Object.assign(activeDocument.value, updatedDoc)
     activeDocument.value.lastModified = new Date()
+    
+    // Process page links for this document
+    const { processDocumentLinksOnSave } = usePageLinks()
+    const updatedDocuments = processDocumentLinksOnSave(updatedDoc, activeWorkspace.value.documents)
+    
+    // Update the workspace with the new documents array
+    activeWorkspace.value.documents = updatedDocuments
+    
+    // Save to localStorage
+    workspaceStore.saveToLocalStorage()
   }
 }
 
@@ -554,9 +661,15 @@ function handlePdfImport(document: any) {
 function handleSlashCommand(event: any) {
   const { position, query, blockIndex } = event
   slashCommandPosition.value = position
-  slashCommandQuery.value = query || ''
+  const newQuery = query || ''
+  
+  // Reset selected index when query changes
+  if (slashCommandQuery.value !== newQuery) {
+    selectedCommandIndex.value = 0
+  }
+  
+  slashCommandQuery.value = newQuery
   activeBlockIndex.value = blockIndex || 0
-  selectedCommandIndex.value = 0
   showSlashCommand.value = true
 }
 
@@ -582,6 +695,61 @@ function closeSlashCommand() {
 function getSlashCommandTitle() {
   const docType = activeDocument.value?.type || 'page'
   return `${docType.charAt(0).toUpperCase() + docType.slice(1)} Commands`
+}
+
+// Keyboard navigation for slash command menu
+function handleSlashCommandKeydown(event: KeyboardEvent) {
+  if (!showSlashCommand.value) return
+  
+  const commands = filteredSlashCommands.value
+  if (commands.length === 0) return
+  
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      selectedCommandIndex.value = (selectedCommandIndex.value + 1) % commands.length
+      scrollSelectedItemIntoView()
+      break
+      
+    case 'ArrowUp':
+      event.preventDefault()
+      selectedCommandIndex.value = selectedCommandIndex.value <= 0 
+        ? commands.length - 1 
+        : selectedCommandIndex.value - 1
+      scrollSelectedItemIntoView()
+      break
+      
+    case 'Enter':
+      event.preventDefault()
+      if (commands[selectedCommandIndex.value]) {
+        executeSlashCommand(commands[selectedCommandIndex.value])
+      }
+      break
+      
+    case 'Escape':
+      event.preventDefault()
+      closeSlashCommand()
+      break
+  }
+}
+
+// Scroll selected command into view
+function scrollSelectedItemIntoView() {
+  nextTick(() => {
+    const selectedItem = document.querySelector('.slash-command-item--selected')
+    if (selectedItem) {
+      selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  })
+}
+
+// Global keyboard event listeners
+function setupKeyboardListeners() {
+  document.addEventListener('keydown', handleSlashCommandKeydown)
+}
+
+function removeKeyboardListeners() {
+  document.removeEventListener('keydown', handleSlashCommandKeydown)
 }
 
 // Tab management methods
@@ -630,8 +798,7 @@ function openSettings() {
 
 function openHelp() {
   showAppMenu.value = false
-  // TODO: Implement help modal
-  console.log('Opening help...')
+  showHelpModal.value = true
 }
 
 function showAbout() {
@@ -664,6 +831,124 @@ function changeDocumentType(newType: string) {
   closeTypeChanger()
 }
 
+async function saveAsTemplate() {
+  if (!selectedDocument.value) return
+  
+  const templateName = prompt('Enter a name for this template:')
+  if (!templateName) return
+  
+  try {
+    // Get the document content (for pages, this should include blocks structure)
+    let templateContent = null
+    
+    if (selectedDocument.value.type === 'page') {
+      // For page documents, save the blocks structure if available
+      templateContent = {
+        type: 'page',
+        blocks: selectedDocument.value.blocks || selectedDocument.value.content || '',
+        content: selectedDocument.value.content || ''
+      }
+    } else {
+      // For other document types, save the raw content
+      templateContent = {
+        type: selectedDocument.value.type,
+        content: selectedDocument.value.content
+      }
+    }
+    
+    // For now, we'll store templates in localStorage (later we can integrate with Prisma)
+    const workspaceId = activeWorkspaceId.value
+    if (!workspaceId) return
+    
+    const template = {
+      id: `template-${Date.now()}`,
+      name: templateName,
+      content: templateContent,
+      workspaceId: workspaceId,
+      createdAt: new Date().toISOString()
+    }
+    
+    // Get existing templates from localStorage
+    const existingTemplates = JSON.parse(localStorage.getItem('athena-templates') || '[]')
+    existingTemplates.push(template)
+    localStorage.setItem('athena-templates', JSON.stringify(existingTemplates))
+    
+    alert(`Template "${templateName}" saved successfully!`)
+    
+  } catch (error) {
+    console.error('Error saving template:', error)
+    alert('Failed to save template. Please try again.')
+  }
+  
+  closeTypeChanger()
+}
+
+// Template picker functions
+function showTemplatePickerModal() {
+  loadTemplates()
+  showTemplatePicker.value = true
+}
+
+function closeTemplatePicker() {
+  showTemplatePicker.value = false
+}
+
+function loadTemplates() {
+  try {
+    const templates = JSON.parse(localStorage.getItem('athena-templates') || '[]')
+    const workspaceId = activeWorkspaceId.value
+    availableTemplates.value = templates.filter((template: any) => template.workspaceId === workspaceId)
+  } catch (error) {
+    console.error('Error loading templates:', error)
+    availableTemplates.value = []
+  }
+}
+
+function applyTemplate(template: any) {
+  try {
+    const workspaceId = activeWorkspaceId.value
+    if (!workspaceId || !workspaceStore.activeWorkspace) {
+      throw new Error('No active workspace')
+    }
+    
+    // Create a new document with the template content
+    let documentData: any = {
+      title: `${template.name} (Copy)`,
+      type: template.content.type || 'page'
+    }
+    
+    // Apply template content based on document type
+    if (template.content.type === 'page' && template.content.blocks) {
+      // For page templates with blocks structure
+      documentData.blocks = Array.isArray(template.content.blocks) 
+        ? [...template.content.blocks]  // Deep copy the blocks
+        : template.content.blocks
+      documentData.content = template.content.content || ''
+    } else {
+      // For other document types or simple content
+      documentData.content = template.content.content || template.content || ''
+    }
+    
+    // Create the document in the workspace
+    const newDocument = workspaceStore.openDocument(workspaceId, documentData)
+    
+    closeTemplatePicker()
+  } catch (error) {
+    console.error('Error applying template:', error)
+    alert('Failed to apply template. Please try again.')
+  }
+}
+
+function createBlankDocument() {
+  createNewDocument('page')
+  closeTemplatePicker()
+}
+
+function showTemplatePickerFromMenu() {
+  showNewDocumentMenu.value = false
+  showTemplatePickerModal()
+}
+
 function closeTypeChanger() {
   showTypeChanger.value = false
   selectedDocument.value = null
@@ -674,6 +959,7 @@ function closeOverlays() {
   showAppMenu.value = false
   showNewDocumentMenu.value = false
   closeTypeChanger()
+  closeTemplatePicker()
 }
 
 // Initialize workspace store immediately to ensure consistent SSR/client rendering
@@ -685,6 +971,9 @@ onMounted(() => {
   if (process.client) {
     workspaceStore.initialize()
   }
+  
+  // Setup keyboard listeners
+  setupKeyboardListeners()
   
   // Create default untitled document if no documents exist
   nextTick(() => {
@@ -707,6 +996,11 @@ onMounted(() => {
       workspaceStore.setActiveTab(activeWorkspace.value.id, tab.id)
     }
   })
+})
+
+onUnmounted(() => {
+  // Remove keyboard listeners
+  removeKeyboardListeners()
 })
 
 // Utility function to generate IDs
@@ -1165,6 +1459,38 @@ function generateId() {
 
 .app-layout--dark .type-description {
   color: #9ca3af;
+}
+
+/* Template Option Styles */
+.type-changer-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 8px 0;
+}
+
+.app-layout--dark .type-changer-divider {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.type-changer-subheader {
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.app-layout--dark .type-changer-subheader {
+  color: #9ca3af;
+}
+
+.template-option:hover {
+  background: rgba(34, 197, 94, 0.08) !important;
+}
+
+.app-layout--dark .template-option:hover {
+  background: rgba(34, 197, 94, 0.15) !important;
 }
 
 /* Pages Menu Button */
@@ -1974,6 +2300,16 @@ function generateId() {
   font-weight: 400;
 }
 
+.new-doc-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 4px 0;
+}
+
+.app-layout--dark .new-doc-divider {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* Tab Scroll Buttons */
 .tab-scroll-btn {
   width: 24px;
@@ -2167,5 +2503,199 @@ function generateId() {
     height: 56px;
     padding: 0 12px;
   }
+}
+
+/* Template Picker Modal */
+.template-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.template-picker-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.app-layout--dark .template-picker-modal {
+  background: #2d3748;
+}
+
+.template-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.app-layout--dark .template-picker-header {
+  border-bottom-color: #4a5568;
+}
+
+.template-picker-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.app-layout--dark .template-picker-header h3 {
+  color: #f9fafb;
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.app-layout--dark .close-btn:hover {
+  background: #4a5568;
+  color: #f9fafb;
+}
+
+.template-picker-content {
+  padding: 0 24px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.template-section {
+  margin-bottom: 32px;
+}
+
+.template-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.app-layout--dark .template-section h4 {
+  color: #d1d5db;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: #ffffff;
+}
+
+.template-item:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+
+.template-item--blank:hover {
+  border-color: #059669;
+  background: #f0fdf4;
+}
+
+.app-layout--dark .template-item {
+  background: #374151;
+  border-color: #4b5563;
+}
+
+.app-layout--dark .template-item:hover {
+  border-color: #3b82f6;
+  background: #1f2937;
+}
+
+.app-layout--dark .template-item--blank:hover {
+  border-color: #059669;
+  background: #064e3b;
+}
+
+.template-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.template-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.template-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.template-description {
+  display: block;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.app-layout--dark .template-title {
+  color: #f9fafb;
+}
+
+.app-layout--dark .template-description {
+  color: #9ca3af;
+}
+
+.no-templates {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.app-layout--dark .no-templates {
+  color: #9ca3af;
+}
+
+.no-templates-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.no-templates p {
+  margin: 8px 0;
+}
+
+.no-templates-hint {
+  font-size: 14px;
+  opacity: 0.8;
 }
 </style>
