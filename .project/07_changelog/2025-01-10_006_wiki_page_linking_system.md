@@ -8,11 +8,7 @@
 Implemented a comprehensive wiki-style page linking system with bidirectional linking capabilities, enabling users to create interconnected knowledge graphs using [[Page Name]] syntax with autocomplete suggestions and automatic backlinks tracking.
 
 ## Changes
-- Added wiki-style page linking with [[Page Name]] syntax detection
-- Implemented autocomplete menu with keyboard navigation for page suggestions
-- Created bidirectional linking system with automatic backlinks tracking
-- Built comprehensive backlinks UI component displaying linked documents
-- Added page link processing logic for document save operations
+- Added wikigocument save operations
 - Implemented page navigation functionality for clickable links
 - Created reusable composable for page linking utilities
 

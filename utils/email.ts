@@ -5,7 +5,7 @@ export class EmailService {
 
   private static getTransporter() {
     if (!this.transporter) {
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || '587'),
         secure: false,
@@ -48,7 +48,7 @@ export class EmailService {
     }
 
     try {
-      await transporter.sendMail(mailOptions)
+      await transporter?.sendMail(mailOptions)
     } catch (error) {
       console.error('Failed to send welcome email:', error)
       // Don't throw error - email failure shouldn't block registration
@@ -96,7 +96,7 @@ export class EmailService {
     }
 
     try {
-      await transporter.sendMail(mailOptions)
+      await transporter?.sendMail(mailOptions)
       return true
     } catch (error) {
       console.error('Failed to send password reset email:', error)

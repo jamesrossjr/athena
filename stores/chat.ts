@@ -1,14 +1,22 @@
 import { defineStore } from 'pinia'
 
+interface Message {
+  id: number
+  role: string
+  content: string
+  timestamp: Date
+  sources: string[]
+}
+
 export const useChatStore = defineStore('chat', {
   state: () => ({
-    messages: [],
+    messages: [] as Message[],
     isTyping: false,
     currentThread: null
   }),
   
   actions: {
-    async sendMessage(content) {
+    async sendMessage(content: any) {
       const userMessage = {
         id: Date.now(),
         role: 'user',
@@ -40,7 +48,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
     
-    async processMessage(content) {
+    async processMessage(content: any) {
       // Mock AI processing
       await new Promise(resolve => setTimeout(resolve, 2000))
       

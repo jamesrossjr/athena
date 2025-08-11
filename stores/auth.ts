@@ -41,7 +41,11 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await $fetch('/api/auth/me')
         if (response.success && response.user) {
-          this.user = response.user
+          this.user = {
+            ...response.user,
+            isVerified: response.user.isVerified || false,
+            createdAt: response.user.createdAt || new Date().toISOString()
+          }
           this.isAuthenticated = true
         } else {
           this.user = null
@@ -68,7 +72,11 @@ export const useAuthStore = defineStore('auth', {
         })
 
         if (response.success && response.user) {
-          this.user = response.user
+          this.user = {
+            ...response.user,
+            isVerified: response.user.isVerified || false,
+            createdAt: response.user.createdAt || new Date().toISOString()
+          }
           this.isAuthenticated = true
           return { success: true, message: response.message }
         } else {
@@ -95,7 +103,11 @@ export const useAuthStore = defineStore('auth', {
         })
 
         if (response.success && response.user) {
-          this.user = response.user
+          this.user = {
+            ...response.user,
+            isVerified: response.user.isVerified || false,
+            createdAt: response.user.createdAt || new Date().toISOString()
+          }
           this.isAuthenticated = true
           return { success: true, message: response.message }
         } else {
@@ -116,7 +128,11 @@ export const useAuthStore = defineStore('auth', {
         })
 
         if (response.success && response.user) {
-          this.user = response.user
+          this.user = {
+            ...response.user,
+            isVerified: response.user.isVerified || false,
+            createdAt: response.user.createdAt || new Date().toISOString()
+          }
           this.isAuthenticated = true
           return { success: true, message: response.message }
         } else {

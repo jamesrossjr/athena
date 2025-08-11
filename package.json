@@ -48,7 +48,13 @@
     "pdfjs-dist": "^4.0.269",
     "pinia": "^3.0.3",
     "prisma": "^6.13.0",
-    "zod": "^4.0.16"
+    "zod": "^4.0.16",
+    "axios": "^1.6.0",
+    "ws": "^8.14.2",
+    "chokidar": "^3.5.3",
+    "node-cron": "^3.0.3",
+    "chromadb": "^1.8.1",
+    "ollama": "^0.5.0"
   },
   "devDependencies": {
     "@iconify-json/heroicons": "^1.2.2",

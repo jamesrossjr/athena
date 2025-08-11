@@ -87,7 +87,7 @@
               class="vivaldi-tab"
               :class="{ 
                 'vivaldi-tab--active': doc.id === activeDocument?.id,
-                'vivaldi-tab--modified': doc.modified 
+                'vivaldi-tab--modified': !doc.isHibernated 
               }"
             >
               <span class="tab-icon">{{ getDocumentIcon(doc) }}</span>
@@ -95,7 +95,7 @@
               <button 
                 @click.stop="closeDocument(doc.id)"
                 class="tab-close"
-                :class="{ 'tab-close--visible': doc.id === activeDocument?.id || doc.modified }"
+                :class="{ 'tab-close--visible': doc.id === activeDocument?.id || !doc.isHibernated }"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -288,7 +288,7 @@
               <span class="command-title">{{ command.title }}</span>
               <span class="command-description">{{ command.description }}</span>
             </div>
-            <span v-if="command.shortcut" class="command-shortcut">{{ command.shortcut }}</span>
+            <span v-if="'shortcut' in command" class="command-shortcut">{{ (command as any).shortcut }}</span>
           </button>
         </div>
       </div>
@@ -415,6 +415,11 @@
       @close="showHelpModal = false"
     />
     
+    <!-- AI Assistant -->
+    <ClientOnly>
+      <AIAssistant :is-dark-mode="isDarkMode" />
+    </ClientOnly>
+    
     <!-- Click outside overlay -->
     <div v-if="showWorkspaceMenu || showAppMenu || showNewDocumentMenu" class="overlay" @click="closeOverlays"></div>
   </div>
@@ -428,6 +433,7 @@ import TileLayout from './TileLayout.vue'
 import DocumentRenderer from './DocumentRenderer.vue'
 import PdfImporter from './PdfImporter.vue'
 import HelpCommandsModal from './HelpCommandsModal.vue'
+import AIAssistant from './AIAssistant.vue'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -676,7 +682,7 @@ function handleSlashCommand(event: any) {
 function executeSlashCommand(command: any) {
   if (activeDocument.value && documentRenderer.value) {
     // Get the PageEditor component reference
-    const pageEditor = documentRenderer.value.$refs?.pageEditor || documentRenderer.value
+    const pageEditor = (documentRenderer.value as any)?.$refs?.pageEditor || documentRenderer.value
     
     // Execute slash command on the PageEditor
     if (pageEditor && typeof pageEditor.executeSlashCommand === 'function') {
@@ -821,9 +827,9 @@ function changeDocumentType(newType: string) {
     if (workspaceId) {
       const document = activeWorkspace.value?.documents.find(d => d.id === selectedDocument.value.id)
       if (document) {
-        document.type = newType
-        // Mark as modified
-        document.modified = true
+        document.type = newType as 'page' | 'table' | 'whiteboard' | 'database' | 'pdf' | 'canvas'
+        // Mark as not hibernated
+        document.isHibernated = false
         document.lastModified = new Date()
       }
     }
@@ -981,11 +987,11 @@ onMounted(() => {
       const defaultDoc = {
         id: generateId(),
         title: 'Untitled',
-        type: 'page',
+        type: 'page' as const,
         content: '',
         lastModified: new Date(),
         created: new Date(),
-        modified: false
+        isHibernated: false
       }
       
       // Add document to workspace

@@ -36,7 +36,7 @@ export class AuthUtils {
     if (!secret) {
       throw new Error('JWT_SECRET environment variable is not set')
     }
-    return jwt.sign(payload, secret, { expiresIn })
+    return jwt.sign(payload, secret, { expiresIn: expiresIn as any })
   }
 
   static verifyJWT(token: string): JWTPayload | null {

@@ -619,7 +619,7 @@ function updateDatabase() {
 
 // Watch for document changes
 watch(() => props.document.content, (newContent) => {
-  if (newContent && newContent !== { schema: schema.value, records: records.value }) {
+  if (newContent) {
     if (newContent.schema) schema.value = newContent.schema.map(col => ({ ...col }))
     if (newContent.records) records.value = newContent.records.map(record => ({ ...record }))
   }

@@ -79,12 +79,12 @@ function generatePreview(document: any): string {
     for (const block of document.blocks) {
       if (block.content && block.content.includes(`[[`)) {
         // Look for the current document reference
-        const currentDoc = props.documents.find(d => d.id === props.documentId)
-        if (currentDoc && block.content.toLowerCase().includes(currentDoc.title.toLowerCase())) {
+        const currentDoc = props.documents.find((d: any) => d.id === props.documentId)
+        if (currentDoc && block.content.toLowerCase().includes((currentDoc as any).title.toLowerCase())) {
           // Extract surrounding context
           const sentences = block.content.split(/[.!?]+/)
           for (const sentence of sentences) {
-            if (sentence.toLowerCase().includes(currentDoc.title.toLowerCase())) {
+            if (sentence.toLowerCase().includes((currentDoc as any).title.toLowerCase())) {
               return sentence.trim().substring(0, 100) + (sentence.length > 100 ? '...' : '')
             }
           }

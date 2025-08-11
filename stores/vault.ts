@@ -1,8 +1,16 @@
 import { defineStore } from 'pinia'
 
+interface Note {
+  id: number
+  title: string
+  content: string
+  created: Date
+  updated: Date
+}
+
 export const useVaultStore = defineStore('vault', {
   state: () => ({
-    notes: [],
+    notes: [] as Note[],
     folders: [],
     selectedNote: null,
     searchQuery: '',
@@ -22,7 +30,7 @@ export const useVaultStore = defineStore('vault', {
       }
     },
     
-    createNote(note) {
+    createNote(note: any) {
       const newNote = {
         id: Date.now(),
         created: new Date(),
@@ -33,21 +41,21 @@ export const useVaultStore = defineStore('vault', {
       return newNote
     },
     
-    updateNote(id, updates) {
+    updateNote(id: any, updates: any) {
       const note = this.notes.find(n => n.id === id)
       if (note) {
         Object.assign(note, updates, { updated: new Date() })
       }
     },
     
-    deleteNote(id) {
+    deleteNote(id: any) {
       const index = this.notes.findIndex(n => n.id === id)
       if (index > -1) {
         this.notes.splice(index, 1)
       }
     },
     
-    searchNotes(query) {
+    searchNotes(query: any) {
       this.searchQuery = query
       return this.notes.filter(note => 
         note.title.toLowerCase().includes(query.toLowerCase()) ||

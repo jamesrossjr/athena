@@ -1,3 +1,5 @@
+import { ref, readonly, onMounted, onUnmounted } from 'vue'
+
 export const useCommandPalette = () => {
   const isOpen = ref(false)
 

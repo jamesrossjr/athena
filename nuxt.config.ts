@@ -11,9 +11,7 @@ export default defineNuxtConfig({
   ],
   
   ui: {
-    pro: {
-      license: process.env.NUXT_UI_PRO_LICENSE || '739C0067-5E6C-4D2F-A835-548A4820AF6F'
-    }
+    // pro configuration removed - not needed for regular ui
   },
   
   css: ['~/assets/css/main.css'],

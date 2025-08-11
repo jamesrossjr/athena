@@ -43,7 +43,7 @@
       <div class="flex items-center gap-2">
         <button
           @click="zoomOut"
-          :disabled="scale <= 0.5"
+          :disabled="typeof scale === 'number' && scale <= 0.5"
           class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title="Zoom Out"
         >
@@ -69,7 +69,7 @@
         
         <button
           @click="zoomIn"
-          :disabled="scale >= 3"
+          :disabled="typeof scale === 'number' && scale >= 3"
           class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title="Zoom In"
         >
@@ -201,8 +201,8 @@ const loadPdf = async () => {
     } else if (props.documentId) {
       // Load from document ID
       const response = await $fetch(`/api/documents/${props.documentId}`)
-      if (response.fileData) {
-        const pdfDataBytes = atob(response.fileData)
+      if ((response as any).fileData) {
+        const pdfDataBytes = atob((response as any).fileData)
         const uint8Array = new Uint8Array(pdfDataBytes.length)
         for (let i = 0; i < pdfDataBytes.length; i++) {
           uint8Array[i] = pdfDataBytes.charCodeAt(i)
@@ -351,12 +351,12 @@ const downloadPdf = async () => {
   try {
     if (props.documentId) {
       const response = await $fetch(`/api/documents/${props.documentId}`)
-      if (response.fileData) {
-        const blob = new Blob([atob(response.fileData)], { type: 'application/pdf' })
+      if ((response as any).fileData) {
+        const blob = new Blob([atob((response as any).fileData)], { type: 'application/pdf' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = response.fileName || 'document.pdf'
+        a.download = (response as any).fileName || 'document.pdf'
         a.click()
         URL.revokeObjectURL(url)
       }
