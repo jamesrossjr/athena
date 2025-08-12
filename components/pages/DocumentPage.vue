@@ -22,6 +22,19 @@
           <span class="command-name">{{ command.name }}</span>
         </div>
       </div>
+      
+      <!-- Layout Brush Instructions -->
+      <div v-if="layoutBrushMode" class="layout-brush-instructions">
+        <h4>🎨 Layout Brush Mode</h4>
+        <ul>
+          <li>Click blocks to select them</li>
+          <li>Press <kbd>Enter</kbd> to arrange into columns</li>
+          <li>Press <kbd>Esc</kbd> to exit</li>
+        </ul>
+        <div style="margin-top: 0.5rem; color: #6b7280; font-size: 0.8rem;">
+          Selected: {{ selectedBlocks.length }} blocks
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -223,10 +236,26 @@ const InvisibleGridExtension = Extension.create({
           }
         }
         
+        // NEW NESTED CONTEXT LOGIC:
+        // Shift+Tab should work at the CURRENT LEVEL, treating each context as a mini-document
+        
+        // Find the immediate parent context where we can create columns
+        const currentParagraph = $from.parent
+        if (currentParagraph.type.name !== 'paragraph') {
+          console.log('❌ Not in a paragraph - cannot create columns')
+          return true
+        }
+        
+        // Get the parent container (could be document root or a column)
+        const parentContainer = $from.node($from.depth - 1)
+        const currentParentPos = $from.before($from.depth)
+        const currentStart = currentParentPos
+        const currentEnd = currentParentPos + currentParagraph.nodeSize
+        
+        console.log(`🔍 Working within ${parentContainer.type.name} context`)
+        
+        // Check if we're at the first column in a columns group - if so, navigate
         if (inColumns) {
-          // NAVIGATION MODE: Move to previous column
-          console.log('⬅️ Inside columns - navigating to previous column')
-          
           const columnsNode = $from.node(columnsDepth)
           const columnsPos = $from.before(columnsDepth)
           
@@ -246,9 +275,10 @@ const InvisibleGridExtension = Extension.create({
           }
           
           if (currentColumnIndex > 0) {
-            // Move to previous column (left)
-            let targetPos = columnsPos + 1
+            // NAVIGATION: Move to previous column at current level
+            console.log('⬅️ Navigating to previous column in current columns group')
             
+            let targetPos = columnsPos + 1
             for (let i = 0; i < currentColumnIndex - 1; i++) {
               targetPos += columnsNode.child(i).nodeSize
             }
@@ -257,98 +287,92 @@ const InvisibleGridExtension = Extension.create({
             view.dispatch(tr)
             console.log(`⬅️ Moved to column ${currentColumnIndex - 1}`)
             return true
-          } else {
-            console.log('📍 Already at first column')
-            return true
-          }
-        } else {
-          // CREATION MODE: Create columns from current and previous block
-          console.log('📝 Not in columns - creation mode')
-          
-          const currentParagraph = $from.parent
-          if (currentParagraph.type.name !== 'paragraph') {
-            console.log('❌ Not in a paragraph')
-            return true
           }
           
-          // Get current paragraph position
-          const currentParentPos = $from.before($from.depth)
-          const currentStart = currentParentPos
-          const currentEnd = currentParentPos + currentParagraph.nodeSize
+          // If at first column, fall through to creation mode within this column
+          console.log('📍 At first column - will try to create sub-columns within current context')
+        }
+        
+        // CREATION MODE: Work within current context (document root or column)
+        console.log('📝 Creation mode - looking for previous block in current context')
           
-          // Find immediately preceding block
-          let prevBlock = null
-          let prevBlockPos = null
-          
-          const parent = $from.node($from.depth - 1)
-          let currentIndex = -1
-          
-          parent.forEach((child, offset, index) => {
-            const childPos = $from.start($from.depth - 1) + offset
-            if (childPos === currentStart) {
-              currentIndex = index
-              if (index > 0) {
-                // Get previous block
-                parent.forEach((prevChild, prevOffset, prevIndex) => {
-                  if (prevIndex === index - 1) {
-                    prevBlock = prevChild
-                    prevBlockPos = $from.start($from.depth - 1) + prevOffset
-                  }
-                })
-              }
+        // Find immediately preceding block in current context
+        let prevBlock = null
+        let prevBlockPos = null
+        
+        parentContainer.forEach((child, offset, index) => {
+          const childPos = $from.start($from.depth - 1) + offset
+          if (childPos === currentStart) {
+            if (index > 0) {
+              // Get previous block in this context
+              parentContainer.forEach((prevChild, prevOffset, prevIndex) => {
+                if (prevIndex === index - 1) {
+                  prevBlock = prevChild
+                  prevBlockPos = $from.start($from.depth - 1) + prevOffset
+                }
+              })
             }
-          })
+          }
+        })
           
           if (!prevBlock) {
-            console.log('❌ No previous block found')
-            return true
-          }
-          
-          let newColumnsNode
-          let replaceStart = prevBlockPos
-          let replaceEnd = currentEnd
-          
-          if (prevBlock.type.name === 'paragraph') {
-            // Create [prev_text | current_text]
-            console.log('📝 Creating [prev_text | current_text]')
-            newColumnsNode = state.schema.nodes.columns.create({}, [
-              state.schema.nodes.paragraph.create({}, prevBlock.content),
-              state.schema.nodes.paragraph.create({}, currentParagraph.content)
-            ])
-          } else if (prevBlock.type.name === 'columns') {
-            // Add to existing: [col1 | col2 | current_text]
-            console.log('🧩 Adding to existing columns')
-            const existingColumns = []
-            prevBlock.forEach(child => existingColumns.push(child))
-            existingColumns.push(state.schema.nodes.paragraph.create({}, currentParagraph.content))
-            newColumnsNode = state.schema.nodes.columns.create({}, existingColumns)
-          } else {
-            console.log('❌ Cannot create columns with block type:', prevBlock.type.name)
-            return true
-          }
-          
-          const tr = state.tr.replaceWith(replaceStart, replaceEnd, newColumnsNode)
-          
-          // Position cursor at BEGINNING of the moved block (current text)
-          let targetPos = replaceStart + 1
-          
-          // Navigate to the last column (where current text now lives)
-          let columnCount = 0
-          newColumnsNode.descendants((node, pos) => {
-            if (node.type.name === 'paragraph') {
-              columnCount++
-              if (columnCount === newColumnsNode.childCount) {
-                targetPos = replaceStart + pos + 1
-                return false
-              }
-            }
-          })
-          
-          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(targetPos)))
-          view.dispatch(tr)
-          
-          console.log('✅ Created columns and positioned cursor at beginning of moved block')
+          console.log(`❌ No previous block found in ${parentContainer.type.name} context`)
           return true
+        }
+        
+        console.log(`📋 Found previous block in ${parentContainer.type.name} context:`, {
+          type: prevBlock.type.name,
+          content: prevBlock.type.name === 'paragraph' ? prevBlock.textContent : 'non-paragraph'
+        })
+        
+        let newColumnsNode
+        let replaceStart = prevBlockPos
+        let replaceEnd = currentEnd
+        
+        if (prevBlock.type.name === 'paragraph') {
+          // Create [prev_text | current_text] within current context
+          const contextName = parentContainer.type.name === 'doc' ? 'document' : 'column'
+          console.log(`🏗️ Creating nested columns within ${contextName}: [prev_text | current_text]`)
+          newColumnsNode = state.schema.nodes.columns.create({}, [
+            state.schema.nodes.paragraph.create({}, prevBlock.content),
+            state.schema.nodes.paragraph.create({}, currentParagraph.content)
+          ])
+        } else if (prevBlock.type.name === 'columns') {
+          // Add to existing: [col1 | col2 | current_text]
+          const contextName = parentContainer.type.name === 'doc' ? 'document' : 'column'
+          console.log(`🧩 Extending existing columns within ${contextName}: [col1 | col2 | current_text]`)
+          const existingColumns = []
+          prevBlock.forEach(child => existingColumns.push(child))
+          existingColumns.push(state.schema.nodes.paragraph.create({}, currentParagraph.content))
+          newColumnsNode = state.schema.nodes.columns.create({}, existingColumns)
+        } else {
+          console.log('❌ Cannot create columns with block type:', prevBlock.type.name)
+          return true
+        }
+        
+        const tr = state.tr.replaceWith(replaceStart, replaceEnd, newColumnsNode)
+        
+        // Position cursor at BEGINNING of the moved block (current text)
+        let targetPos = replaceStart + 1
+        
+        // Navigate to the last column (where current text now lives)
+        let columnCount = 0
+        newColumnsNode.descendants((node, pos) => {
+          if (node.type.name === 'paragraph') {
+            columnCount++
+            if (columnCount === newColumnsNode.childCount) {
+              targetPos = replaceStart + pos + 1
+              return false
+            }
+          }
+        })
+        
+        tr.setSelection(state.selection.constructor.near(tr.doc.resolve(targetPos)))
+        view.dispatch(tr)
+        
+        const contextName = parentContainer.type.name === 'doc' ? 'document' : 'column'
+        console.log(`✅ Created nested columns within ${contextName} and positioned cursor at beginning of moved block`)
+        return true
         }
       },
       
@@ -480,6 +504,23 @@ const InvisibleGridExtension = Extension.create({
         }
         
         return false // Use default behavior
+      },
+      
+      // Layout Brush Mode shortcuts
+      'Escape': () => {
+        if (layoutBrushMode.value) {
+          exitLayoutBrush()
+          return true
+        }
+        return false
+      },
+      
+      'Enter': ({ editor }) => {
+        if (layoutBrushMode.value && selectedBlocks.value.length >= 2) {
+          arrangeSelectedIntoColumns()
+          return true
+        }
+        return false
       }
     }
   }
@@ -542,6 +583,13 @@ const slashCommands = [
   { id: 'heading3', name: 'Heading 3', icon: '𝗛𝟯', command: () => setHeading(3) },
   { id: 'bulletlist', name: 'Bullet List', icon: '∘', command: () => setBlockType('bulletList') },
   { id: 'orderedlist', name: 'Numbered List', icon: '𝟏.', command: () => setBlockType('orderedList') },
+  
+  // ADVANCED COLUMN COMMANDS
+  { id: 'columns2', name: 'Two Columns', icon: '⦀', command: () => createColumns(2) },
+  { id: 'columns3', name: 'Three Columns', icon: '⦀', command: () => createColumns(3) },
+  { id: 'columns4', name: 'Four Columns', icon: '⦀', command: () => createColumns(4) },
+  { id: 'columns', name: 'Custom Columns (add number)', icon: '⦀', command: (params) => createColumns(params) },
+  { id: 'layout', name: 'Layout Brush Mode', icon: '🎨', command: () => activateLayoutBrush() },
 ]
 
 const filteredCommands = computed(() => {
@@ -559,26 +607,47 @@ const filteredCommands = computed(() => {
 const executeCommand = (command: any) => {
   if (!editor.value) return
   
-  // Clear the slash command from text
+  // Clear the slash command from text and parse parameters
   const { state } = editor.value
   const { selection } = state
   const { $from } = selection
   
-  // Find the slash position and delete it
+  // Find the slash position and extract full command with parameters
   const textBefore = $from.parent.textBetween(0, $from.parentOffset)
   const slashIndex = textBefore.lastIndexOf('/')
+  
+  let commandParams = null
   
   if (slashIndex !== -1) {
     const deleteFrom = $from.pos - ($from.parentOffset - slashIndex)
     const deleteTo = $from.pos
+    
+    // Extract the full command text to parse parameters
+    const fullCommand = textBefore.substring(slashIndex + 1)
+    console.log('🔧 Full command:', fullCommand)
+    
+    // Parse parameters (e.g., "columns 3" -> params = 3)
+    const parts = fullCommand.trim().split(/\\s+/)
+    if (parts.length > 1 && command.id === 'columns') {
+      const numberParam = parseInt(parts[1])
+      if (!isNaN(numberParam) && numberParam >= 2 && numberParam <= 8) {
+        commandParams = numberParam
+        console.log('📊 Parsed column count:', commandParams)
+      }
+    }
     
     editor.value.chain()
       .deleteRange({ from: deleteFrom, to: deleteTo })
       .run()
   }
   
-  // Execute the command
-  command.command()
+  // Execute the command with parameters
+  if (commandParams !== null) {
+    command.command(commandParams)
+  } else {
+    command.command()
+  }
+  
   hideSlashMenu()
   
   // Focus back to editor
@@ -608,6 +677,169 @@ const setHeading = (level: number) => {
   editor.value.chain().focus().toggleHeading({ level }).run()
 }
 
+/**
+ * ADVANCED COLUMN COMMANDS
+ */
+const createColumns = (count: number = 2) => {
+  if (!editor.value || count < 2 || count > 8) {
+    console.log('❌ Invalid column count:', count)
+    return
+  }
+  
+  console.log(`🏗️ Creating ${count} columns instantly`)
+  
+  const { state, view } = editor.value
+  const { selection } = state
+  const { $from } = selection
+  
+  // Create array of empty paragraphs for each column
+  const columnBlocks = []
+  for (let i = 0; i < count; i++) {
+    columnBlocks.push(state.schema.nodes.paragraph.create())
+  }
+  
+  const newColumnsNode = state.schema.nodes.columns.create({}, columnBlocks)
+  
+  // Replace current paragraph or insert at current position
+  const currentParagraph = $from.parent
+  if (currentParagraph.type.name === 'paragraph' && currentParagraph.textContent.trim() === '') {
+    // Replace empty paragraph
+    const currentParentPos = $from.before($from.depth)
+    const currentEnd = currentParentPos + currentParagraph.nodeSize
+    
+    const tr = state.tr.replaceWith(currentParentPos, currentEnd, newColumnsNode)
+    
+    // Position cursor in first column
+    const newCursorPos = currentParentPos + 2
+    tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+    
+    view.dispatch(tr)
+  } else {
+    // Insert after current block
+    const insertPos = $from.after($from.depth)
+    const tr = state.tr.insert(insertPos, newColumnsNode)
+    
+    // Position cursor in first column of new columns
+    const newCursorPos = insertPos + 2
+    tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+    
+    view.dispatch(tr)
+  }
+  
+  console.log(`✅ Created ${count} columns successfully`)
+}
+
+/**
+ * LAYOUT BRUSH MODE
+ * Allows visual selection and reorganization of blocks into columns
+ */
+const layoutBrushMode = ref(false)
+const selectedBlocks = ref<any[]>([])
+
+const activateLayoutBrush = () => {
+  if (!editor.value) return
+  
+  console.log('🎨 Activating Layout Brush mode')
+  layoutBrushMode.value = true
+  selectedBlocks.value = []
+  
+  // Add visual feedback to the editor
+  const editorElement = document.querySelector('.ProseMirror')
+  if (editorElement) {
+    editorElement.classList.add('layout-brush-active')
+  }
+  
+  // Show instructions
+  console.log('📝 Layout Brush Instructions:')
+  console.log('  • Click blocks to select them for column layout')
+  console.log('  • Press Enter to arrange selected blocks into columns')
+  console.log('  • Press Escape to exit Layout Brush mode')
+}
+
+const exitLayoutBrush = () => {
+  console.log('❌ Exiting Layout Brush mode')
+  layoutBrushMode.value = false
+  selectedBlocks.value = []
+  
+  // Remove visual feedback
+  const editorElement = document.querySelector('.ProseMirror')
+  if (editorElement) {
+    editorElement.classList.remove('layout-brush-active')
+  }
+}
+
+const toggleBlockSelection = (pos: number) => {
+  if (!layoutBrushMode.value) return
+  
+  console.log('🖱️ Toggling block selection at position:', pos)
+  
+  const blockIndex = selectedBlocks.value.findIndex(block => block.pos === pos)
+  if (blockIndex > -1) {
+    // Remove from selection
+    selectedBlocks.value.splice(blockIndex, 1)
+    console.log('➖ Removed block from selection')
+  } else {
+    // Add to selection
+    selectedBlocks.value.push({ pos })
+    console.log('➕ Added block to selection')
+  }
+  
+  console.log(`📋 Selected blocks: ${selectedBlocks.value.length}`)
+}
+
+const arrangeSelectedIntoColumns = () => {
+  if (!editor.value || selectedBlocks.value.length < 2) {
+    console.log('❌ Need at least 2 blocks to create columns')
+    return
+  }
+  
+  console.log(`🏗️ Arranging ${selectedBlocks.value.length} blocks into columns`)
+  
+  const { state, view } = editor.value
+  
+  // Sort blocks by position
+  const sortedBlocks = [...selectedBlocks.value].sort((a, b) => a.pos - b.pos)
+  
+  // Get the actual block nodes and their content
+  const blockContents = []
+  let firstBlockPos = null
+  let lastBlockPos = null
+  
+  for (const block of sortedBlocks) {
+    const resolvedPos = state.doc.resolve(block.pos)
+    const blockNode = resolvedPos.parent
+    
+    if (blockNode.type.name === 'paragraph') {
+      blockContents.push(state.schema.nodes.paragraph.create({}, blockNode.content))
+      
+      if (firstBlockPos === null) {
+        firstBlockPos = resolvedPos.before(resolvedPos.depth)
+      }
+      lastBlockPos = resolvedPos.after(resolvedPos.depth)
+    }
+  }
+  
+  if (blockContents.length < 2) {
+    console.log('❌ Invalid blocks for column creation')
+    return
+  }
+  
+  // Create columns node
+  const newColumnsNode = state.schema.nodes.columns.create({}, blockContents)
+  
+  // Replace the range from first block to last block
+  const tr = state.tr.replaceWith(firstBlockPos, lastBlockPos, newColumnsNode)
+  
+  // Position cursor in first column
+  const newCursorPos = firstBlockPos + 2
+  tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+  
+  view.dispatch(tr)
+  
+  console.log('✅ Successfully arranged blocks into columns')
+  exitLayoutBrush()
+}
+
 const hideSlashMenu = () => {
   showSlashMenu.value = false
   slashQuery.value = ''
@@ -624,12 +856,15 @@ const handleTextInput = (text: string, from: number, to: number) => {
   const { $from } = state.selection
   
   // Check if we just typed a slash at start of line or after space
+  // Enhanced regex to support parameters like "columns 3"
   const textBefore = $from.parent.textBetween(0, $from.parentOffset)
-  const slashMatch = textBefore.match(/(^|\s)\/([a-zA-Z0-9]*)$/)
+  const slashMatch = textBefore.match(/(^|\s)\/([a-zA-Z0-9\s]*)$/)
   
   if (slashMatch) {
-    const query = slashMatch[2] || ''
-    slashQuery.value = query
+    const fullQuery = slashMatch[2] || ''
+    // For filtering, use just the command name (first word)
+    const commandName = fullQuery.split(/\s+/)[0]
+    slashQuery.value = commandName
     selectedCommandIndex.value = 0
     
     if (!showSlashMenu.value) {
@@ -1085,6 +1320,69 @@ watch(() => props.page, (newPage) => {
   color: #666;
 }
 
+/**
+ * LAYOUT BRUSH MODE STYLES
+ * Visual feedback for block selection and reorganization
+ */
+:deep(.layout-brush-active) {
+  border: 2px dashed var(--theme-accent, #3b82f6) !important;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.03);
+}
+
+:deep(.layout-brush-active p) {
+  cursor: pointer;
+  padding: 0.5rem;
+  margin: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+:deep(.layout-brush-active p:hover) {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+:deep(.layout-brush-active p.selected) {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--theme-accent, #3b82f6);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Layout Brush instructions overlay */
+.layout-brush-instructions {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: var(--theme-surface, white);
+  border: 1px solid var(--theme-border, #e5e7eb);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  font-size: 0.875rem;
+  max-width: 280px;
+}
+
+.layout-brush-instructions h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--theme-accent, #3b82f6);
+  font-weight: 600;
+}
+
+.layout-brush-instructions ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  list-style-type: disc;
+}
+
+.layout-brush-instructions li {
+  margin: 0.25rem 0;
+  line-height: 1.4;
+}
+
 :deep(.ProseMirror ol li::marker) {
   color: #666;
   font-weight: 500;
@@ -1115,6 +1413,34 @@ watch(() => props.page, (newPage) => {
 
 :deep(.paper-columns > p) {
   margin: 0 0 1.25rem 0;
+}
+
+/**
+ * NESTED COLUMNS SUPPORT
+ * Visual hierarchy and spacing for columns within columns
+ */
+:deep(.paper-columns .paper-columns) {
+  /* Nested columns have slightly smaller gap */
+  gap: 1.5rem;
+  margin: 0.75rem 0;
+  
+  /* Subtle visual distinction for nested context */
+  padding: 0.5rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+:deep(.paper-columns .paper-columns .paper-columns) {
+  /* Third-level nesting - even more subtle */
+  gap: 1rem;
+  margin: 0.5rem 0;
+  background: rgba(0, 0, 0, 0.015);
+}
+
+/* Ensure nested columns maintain minimum width */
+:deep(.paper-columns .paper-columns > *) {
+  min-width: 0;
+  flex: 1;
 }
 
 /**
