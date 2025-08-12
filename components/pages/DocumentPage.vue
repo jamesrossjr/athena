@@ -60,10 +60,10 @@ const selectedCommandIndex = ref(0)
 const slashMenuPosition = ref({ top: '0px', left: '0px' })
 
 /**
- * CUSTOM NODE: Invisible Columns Container
+ * CUSTOM NODE: Invisible Columns Container with Resizable Columns
  * 
  * Creates a flexbox container that renders child blocks side-by-side
- * with no visible UI chrome - appears as seamless content
+ * with invisible resizers that appear on hover and allow drag-to-resize
  */
 const ColumnsNode = Node.create({
   name: 'columns',
@@ -71,14 +71,36 @@ const ColumnsNode = Node.create({
   group: 'block',
   content: 'block+',
   
+  addAttributes() {
+    return {
+      columnWidths: {
+        default: null,
+        parseHTML: element => {
+          const widths = element.getAttribute('data-column-widths')
+          return widths ? JSON.parse(widths) : null
+        },
+        renderHTML: attributes => {
+          if (attributes.columnWidths) {
+            return {
+              'data-column-widths': JSON.stringify(attributes.columnWidths)
+            }
+          }
+          return {}
+        }
+      }
+    }
+  },
+  
   parseHTML() {
     return [{ tag: 'div[data-type="columns"]' }]
   },
   
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ HTMLAttributes, node }) {
+    const columnWidths = node.attrs.columnWidths
     return ['div', mergeAttributes(HTMLAttributes, { 
       'data-type': 'columns',
-      'class': 'paper-columns'
+      'class': 'paper-columns',
+      'data-column-widths': columnWidths ? JSON.stringify(columnWidths) : null
     }), 0]
   }
 })
@@ -94,72 +116,458 @@ const InvisibleGridExtension = Extension.create({
   
   addKeyboardShortcuts() {
     return {
-      'Shift-Tab': ({ editor }) => {
-        console.log('🎯 Shift+Tab pressed - attempting to create columns')
-        
+      // Tab navigation between columns
+      'Tab': ({ editor }) => {
         const { state, view } = editor
         const { selection } = state
         const { $from } = selection
         
-        // Find current paragraph
-        const currentParagraph = $from.parent
-        if (currentParagraph.type.name !== 'paragraph') {
-          console.log('❌ Not in a paragraph')
-          return false
+        // Check if we're inside a column
+        console.log('🔍 Tab: Checking column hierarchy')
+        console.log('Current depth:', $from.depth)
+        for (let i = 0; i <= $from.depth; i++) {
+          const node = $from.node(i)
+          console.log(`Level ${i}: ${node.type.name}`)
         }
         
-        // Find position of current paragraph
-        const currentPos = $from.start() - 1
+        let inColumns = false
+        let columnsDepth = -1
         
-        // Look for previous paragraph
-        let prevParagraphPos = null
-        let prevParagraph = null
-        
-        // Walk backwards to find previous paragraph
-        for (let pos = currentPos - 1; pos >= 0; pos--) {
-          const node = state.doc.nodeAt(pos)
-          if (node && node.type.name === 'paragraph') {
-            prevParagraphPos = pos
-            prevParagraph = node
+        for (let i = 1; i <= $from.depth; i++) {
+          if ($from.node(i).type.name === 'columns') {
+            inColumns = true
+            columnsDepth = i
+            console.log('🔍 Found columns at depth:', columnsDepth)
             break
           }
         }
         
-        if (!prevParagraph || prevParagraphPos === null) {
-          console.log('❌ No previous paragraph found')
-          return false
+        if (inColumns && columnsDepth > 0) {
+          console.log('➕ Inside columns - adding new empty column to the right')
+          
+          const columnsNode = $from.node(columnsDepth)
+          const currentParagraph = $from.parent
+          
+          // Create new columns node with all existing columns plus new empty one
+          const existingColumns = []
+          columnsNode.forEach(child => {
+            existingColumns.push(child)
+          })
+          
+          // Add new empty column
+          const emptyParagraph = state.schema.nodes.paragraph.create()
+          existingColumns.push(emptyParagraph)
+          
+          const newColumnsNode = state.schema.nodes.columns.create({}, existingColumns)
+          
+          // Replace the existing columns with the expanded version
+          const columnsPos = $from.before(columnsDepth)
+          const columnsEnd = columnsPos + columnsNode.nodeSize
+          
+          const tr = state.tr.replaceWith(columnsPos, columnsEnd, newColumnsNode)
+          
+          // Position cursor in the new empty column (last column)
+          let targetPos = columnsPos + 1
+          for (let i = 0; i < existingColumns.length - 1; i++) {
+            targetPos += existingColumns[i].nodeSize
+          }
+          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(targetPos + 1)))
+          
+          view.dispatch(tr)
+          console.log('✅ Added new empty column and moved cursor there')
+          return true
         }
         
-        console.log('✅ Found paragraphs to columnize:', {
-          prev: prevParagraph.textContent,
-          current: currentParagraph.textContent
+        // Not in columns - just prevent default tab behavior
+        console.log('Tab pressed outside columns - preventing default indent')
+        return true // Prevent default
+      },
+      
+      'Shift-Tab': ({ editor }) => {
+        const { state, view } = editor
+        const { selection } = state
+        const { $from } = selection
+        
+        // Check if we're already inside a column - if so, navigate left
+        let inColumns = false
+        let columnsDepth = -1
+        
+        for (let i = 1; i <= $from.depth; i++) {
+          if ($from.node(i).type.name === 'columns') {
+            inColumns = true
+            columnsDepth = i
+            break
+          }
+        }
+        
+        if (inColumns && columnsDepth > 0) {
+            console.log('🔄 Inside columns - navigating to previous column')
+            
+            const columnsNode = $from.node(columnsDepth)
+            const columnsPos = $from.before(columnsDepth)
+            
+            // Find which column we're in
+            let currentColumnIndex = -1
+            let currentPos = columnsPos + 1
+            
+            for (let i = 0; i < columnsNode.childCount; i++) {
+              const child = columnsNode.child(i)
+              const childEnd = currentPos + child.nodeSize
+              
+              if ($from.pos >= currentPos && $from.pos < childEnd) {
+                currentColumnIndex = i
+                console.log(`📍 Currently in column ${i}`)
+                break
+              }
+              currentPos = childEnd
+            }
+            
+            if (currentColumnIndex > 0) {
+              // Move to previous column (left)
+              let targetPos = columnsPos + 1
+              
+              // Calculate position of the target column (currentColumnIndex - 1)
+              for (let i = 0; i < currentColumnIndex - 1; i++) {
+                targetPos += columnsNode.child(i).nodeSize
+              }
+              
+              // Position cursor at start of previous column
+              const tr = state.tr.setSelection(state.selection.constructor.near(state.doc.resolve(targetPos + 1)))
+              view.dispatch(tr)
+              console.log(`⬅️ Moved to column ${currentColumnIndex - 1} at position ${targetPos + 1}`)
+              return true
+            } else {
+              console.log('📍 Already at first column')
+            }
+            return true
+        }
+        
+        console.log('🎯 Shift+Tab pressed - attempting to add block to column')
+        
+        // Not in columns - check if current block is a paragraph
+        const currentParagraph = $from.parent
+        if (currentParagraph.type.name !== 'paragraph') {
+          console.log('❌ Not in a paragraph')
+          return true
+        }
+        
+        // Get current paragraph position info
+        const currentParentPos = $from.before($from.depth)
+        const currentStart = currentParentPos
+        const currentEnd = currentParentPos + currentParagraph.nodeSize
+        
+        console.log('Current paragraph info:', {
+          content: currentParagraph.textContent,
+          start: currentStart,
+          end: currentEnd
         })
         
-        // Create columns node
-        const columnsContent = [
-          state.schema.nodes.paragraph.create({}, prevParagraph.content),
-          state.schema.nodes.paragraph.create({}, currentParagraph.content)
-        ]
+        // Find previous block
+        let prevBlock = null
+        let prevBlockPos = null
         
-        const columnsNode = state.schema.nodes.columns.create({}, columnsContent)
+        const parent = $from.node($from.depth - 1)
+        let currentIndex = -1
+        let prevIndex = -1
         
-        // Calculate positions for replacement
-        const startPos = prevParagraphPos
-        const endPos = $from.end() + 1
+        parent.forEach((child, offset, index) => {
+          const childPos = $from.start($from.depth - 1) + offset
+          if (childPos === currentStart) {
+            currentIndex = index
+            prevIndex = index - 1
+          }
+        })
         
-        console.log('📍 Replacing positions:', { startPos, endPos })
+        if (prevIndex >= 0) {
+          parent.forEach((child, offset, index) => {
+            if (index === prevIndex) {
+              prevBlock = child
+              prevBlockPos = $from.start($from.depth - 1) + offset
+            }
+          })
+        }
         
-        // Create and apply transaction
-        const tr = state.tr.replaceWith(startPos, endPos, columnsNode)
+        if (!prevBlock || prevBlockPos === null) {
+          // No previous block - create a new empty block and make columns
+          console.log('➕ No previous block found - creating new empty block for columns')
+          
+          const emptyParagraph = state.schema.nodes.paragraph.create()
+          const columnsContent = [
+            state.schema.nodes.paragraph.create({}, currentParagraph.content),
+            emptyParagraph
+          ]
+          
+          const newColumnsNode = state.schema.nodes.columns.create({}, columnsContent)
+          
+          // Replace current paragraph with the new columns
+          const tr = state.tr.replaceWith(currentStart, currentEnd, newColumnsNode)
+          
+          // Position cursor in the second (empty) column
+          const firstColumnSize = currentParagraph.nodeSize
+          const newCursorPos = currentStart + 1 + firstColumnSize + 1
+          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+          
+          view.dispatch(tr)
+          
+          // Debug: Check the created structure
+          setTimeout(() => {
+            console.log('🔍 Checking created columns structure...')
+            const columnsElements = document.querySelectorAll('.paper-columns')
+            console.log('Found', columnsElements.length, 'column containers')
+            columnsElements.forEach((container, index) => {
+              console.log(`Container ${index}:`, container)
+              console.log('Children:', Array.from(container.children).map(child => child.tagName))
+            })
+          }, 100)
+          
+          console.log('✅ Created new columns with empty block + current block')
+          return true
+        }
         
-        // Position cursor in first column
-        const newCursorPos = startPos + 2
-        tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+        console.log('✅ Found previous block:', {
+          type: prevBlock.type.name,
+          content: prevBlock.type.name === 'paragraph' ? prevBlock.textContent : 'columns'
+        })
+        
+        let newColumnsNode
+        
+        if (prevBlock.type.name === 'columns') {
+          // Check if we just exited from columns - if so, don't create new columns
+          console.log('🔍 Previous block is columns - checking if we should add to it or skip')
+          
+          // Look for the block before the columns to see the pattern
+          let blockBeforeColumns = null
+          if (prevIndex > 0) {
+            parent.forEach((child, offset, index) => {
+              if (index === prevIndex - 1) {
+                blockBeforeColumns = child
+              }
+            })
+          }
+          
+          // If there's a pattern of: columns -> paragraph -> current, don't create columns
+          // This suggests the user exited columns with Enter, so don't auto-create new ones
+          if (blockBeforeColumns && blockBeforeColumns.type.name === 'columns') {
+            console.log('📋 Detected pattern: columns -> paragraph -> current. Skipping column creation.')
+            return true
+          }
+          
+          // Otherwise, add to existing columns
+          console.log('🧩 Adding to existing columns group')
+          
+          const existingColumns = []
+          prevBlock.forEach(child => {
+            existingColumns.push(child)
+          })
+          
+          // Add current paragraph as new column
+          existingColumns.push(state.schema.nodes.paragraph.create({}, currentParagraph.content))
+          
+          newColumnsNode = state.schema.nodes.columns.create({}, existingColumns)
+          
+        } else if (prevBlock.type.name === 'paragraph') {
+          // Create new columns with both blocks
+          console.log('🔧 Creating new columns with both blocks')
+          
+          const columnsContent = [
+            state.schema.nodes.paragraph.create({}, prevBlock.content),
+            state.schema.nodes.paragraph.create({}, currentParagraph.content)
+          ]
+          
+          newColumnsNode = state.schema.nodes.columns.create({}, columnsContent)
+        } else {
+          console.log('❌ Cannot create columns with this block type')
+          return true
+        }
+        
+        if (!newColumnsNode) {
+          console.log('❌ Could not create columns node')
+          return true // Return true to prevent default browser behavior
+        }
+        
+        // Replace both blocks with the new columns node
+        const replaceStart = prevBlockPos
+        const replaceEnd = currentEnd
+        
+        console.log('Replacing from', replaceStart, 'to', replaceEnd)
+        
+        const tr = state.tr.replaceWith(replaceStart, replaceEnd, newColumnsNode)
+        
+        // Position cursor in the second column (the one we just added)
+        // The structure is: columns > paragraph > text
+        // We need to get inside the second paragraph
+        const columnsStart = replaceStart
+        let targetPos = columnsStart + 1 // Start of columns node
+        
+        // Find the second paragraph position
+        let paragraphCount = 0
+        newColumnsNode.descendants((node, pos) => {
+          if (node.type.name === 'paragraph') {
+            paragraphCount++
+            if (paragraphCount === 2) {
+              // This is the second paragraph (the one we just added)
+              targetPos = columnsStart + pos + 1
+              return false // Stop iterating
+            }
+          }
+        })
+        
+        console.log('Setting cursor position to:', targetPos)
+        tr.setSelection(state.selection.constructor.near(tr.doc.resolve(targetPos)))
         
         view.dispatch(tr)
         
-        console.log('✅ Columns created successfully!')
+        console.log('✅ Block added to column successfully!')
+        
+        // Debug: Check where cursor ended up (using setTimeout to let TipTap update)
+        setTimeout(() => {
+          // 'editor' here is the parameter from the keyboard shortcut, not the ref
+          const newState = editor.state
+          const newSelection = newState.selection
+          const $newFrom = newSelection.$from
+          console.log('📍 Cursor position after column creation:')
+          for (let i = 0; i <= $newFrom.depth; i++) {
+            const node = $newFrom.node(i)
+            console.log(`  Level ${i}:`, node.type.name)
+          }
+        }, 10)
+        
         return true
+      },
+      
+      // Enter key behavior - create new paragraph WITHIN column
+      'Enter': ({ editor }) => {
+        const { state } = editor
+        const { selection } = state
+        const { $from } = selection
+        
+        console.log('↵ Enter pressed - checking context')
+        console.log('Current depth:', $from.depth)
+        for (let i = 0; i <= $from.depth; i++) {
+          const node = $from.node(i)
+          console.log(`Level ${i}: ${node.type.name}`)
+        }
+        
+        // Check if we're inside columns - if so, exit them
+        let inColumns = false
+        let columnsNode = null
+        let columnsDepth = null
+        
+        for (let i = 0; i <= $from.depth; i++) {
+          const node = $from.node(i)
+          if (node.type.name === 'columns') {
+            inColumns = true
+            columnsNode = node
+            columnsDepth = i
+            console.log('✅ Found columns at level:', i)
+            break
+          }
+        }
+        
+        if (inColumns && columnsNode && columnsDepth !== null) {
+          console.log('🚪 Enter pressed within column - exiting to create new paragraph below')
+          
+          // Calculate the position of the columns node
+          const columnsPos = $from.before(columnsDepth)
+          const columnsEnd = columnsPos + columnsNode.nodeSize
+          
+          console.log('Columns info:', {
+            depth: columnsDepth,
+            start: columnsPos,
+            end: columnsEnd,
+            nodeSize: columnsNode.nodeSize
+          })
+          
+          // Create new paragraph after the columns
+          const newParagraph = state.schema.nodes.paragraph.create()
+          
+          // Insert the new paragraph after columns and position cursor there
+          const tr = state.tr.insert(columnsEnd, newParagraph)
+          
+          // Set cursor in the new paragraph
+          const newCursorPos = columnsEnd + 1
+          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+          
+          editor.view.dispatch(tr)
+          return true
+        }
+        
+        console.log('ℹ️ Not in columns - using default Enter behavior')
+        return false // Use default behavior for non-column contexts
+      },
+      
+      // Shift+Enter - EXIT columns and create new paragraph below
+      'Shift-Enter': ({ editor }) => {
+        const { state, view } = editor
+        const { selection } = state
+        const { $from } = selection
+        
+        console.log('⏎ Shift+Enter pressed - checking if we need to exit columns')
+        console.log('Current depth:', $from.depth)
+        
+        // Debug: Show the complete node hierarchy
+        for (let i = 0; i <= $from.depth; i++) {
+          const node = $from.node(i)
+          console.log(`Level ${i}:`, node.type.name)
+        }
+        
+        // Check if parent or grandparent is columns
+        let inColumns = false
+        let columnsNode = null
+        let columnsDepth = null
+        
+        // Check parent first (when cursor is in a paragraph inside columns)
+        if ($from.depth >= 1) {
+          const parent = $from.node(1)
+          console.log('Parent node type:', parent.type.name)
+          if (parent.type.name === 'columns') {
+            inColumns = true
+            columnsNode = parent
+            columnsDepth = 1
+          }
+        }
+        
+        // If still not found, check grandparent (in case of nested structure)
+        if (!inColumns && $from.depth >= 2) {
+          const grandparent = $from.node(2)
+          console.log('Grandparent node type:', grandparent.type.name)
+          if (grandparent.type.name === 'columns') {
+            inColumns = true
+            columnsNode = grandparent
+            columnsDepth = 2
+          }
+        }
+        
+        if (inColumns && columnsNode && columnsDepth !== null) {
+          console.log('🚪 Shift+Enter pressed within column - exiting to create new paragraph below')
+          
+          // Calculate the position of the columns node
+          const columnsPos = $from.before(columnsDepth)
+          const columnsEnd = columnsPos + columnsNode.nodeSize
+          
+          console.log('Columns info:', {
+            depth: columnsDepth,
+            start: columnsPos,
+            end: columnsEnd,
+            nodeSize: columnsNode.nodeSize
+          })
+          
+          // Create new paragraph after the columns
+          const newParagraph = state.schema.nodes.paragraph.create()
+          
+          // Insert the new paragraph after columns and position cursor there
+          const tr = state.tr.insert(columnsEnd, newParagraph)
+          
+          // Set cursor in the new paragraph
+          const newCursorPos = columnsEnd + 1
+          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+          
+          view.dispatch(tr)
+          return true
+        }
+        
+        console.log('ℹ️ Not in columns - using default Shift+Enter behavior')
+        return false // Use default behavior for non-column contexts
       },
       
       // Perfect Backspace behavior for block merging
@@ -393,6 +801,173 @@ const handleTextInput = (text: string, from: number, to: number) => {
 /**
  * Initialize Editor with page content
  */
+// Resizer functionality for columns
+const isResizing = ref(false)
+const resizerData = ref({ element: null, startX: 0, startWidths: [] })
+
+const initializeResizers = () => {
+  if (!editor.value) return
+  
+  nextTick(() => {
+    const columnsElements = document.querySelectorAll('.paper-columns')
+    
+    columnsElements.forEach(columnContainer => {
+      // Skip if already has resizers
+      if (columnContainer.querySelector('.column-resizer')) return
+      
+      const children = Array.from(columnContainer.children)
+      if (children.length < 2) return
+      
+      // Insert resizers between columns
+      for (let i = 1; i < children.length; i++) {
+        const resizer = document.createElement('div')
+        resizer.className = 'column-resizer'
+        resizer.setAttribute('data-resizer-index', i.toString())
+        
+        // Insert before the child
+        columnContainer.insertBefore(resizer, children[i])
+        
+        // Add drag functionality
+        resizer.addEventListener('mousedown', handleResizerMouseDown)
+      }
+      
+      // Add hover listeners to show/hide resizers
+      columnContainer.addEventListener('mouseenter', showResizers)
+      columnContainer.addEventListener('mouseleave', hideResizers)
+      
+      // Apply saved column widths if they exist
+      const savedWidths = columnContainer.getAttribute('data-column-widths')
+      if (savedWidths) {
+        try {
+          const widths = JSON.parse(savedWidths)
+          const columns = Array.from(columnContainer.children).filter(el => !el.classList.contains('column-resizer'))
+          
+          columns.forEach((column, index) => {
+            if (widths[index]) {
+              column.style.width = widths[index] + 'px'
+              column.style.flexBasis = widths[index] + 'px'
+              column.style.flexGrow = '0'
+              column.style.flexShrink = '0'
+            }
+          })
+        } catch (e) {
+          console.warn('Failed to parse saved column widths:', e)
+        }
+      }
+    })
+  })
+}
+
+const showResizers = (event) => {
+  const resizers = event.currentTarget.querySelectorAll('.column-resizer')
+  resizers.forEach(resizer => {
+    resizer.style.opacity = '1'
+  })
+}
+
+const hideResizers = (event) => {
+  if (isResizing.value) return
+  
+  const resizers = event.currentTarget.querySelectorAll('.column-resizer')
+  resizers.forEach(resizer => {
+    resizer.style.opacity = '0'
+  })
+}
+
+const handleResizerMouseDown = (event) => {
+  event.preventDefault()
+  isResizing.value = true
+  
+  const resizer = event.target
+  const columnContainer = resizer.closest('.paper-columns')
+  const resizerIndex = parseInt(resizer.getAttribute('data-resizer-index'))
+  
+  // Add visual feedback classes
+  resizer.classList.add('resizing')
+  columnContainer.classList.add('is-resizing')
+  
+  // Get current column widths
+  const columns = Array.from(columnContainer.children).filter(el => !el.classList.contains('column-resizer'))
+  const currentWidths = columns.map(col => col.offsetWidth)
+  
+  resizerData.value = {
+    element: resizer,
+    startX: event.clientX,
+    startWidths: currentWidths,
+    columnContainer,
+    resizerIndex,
+    leftColumn: columns[resizerIndex - 1],
+    rightColumn: columns[resizerIndex]
+  }
+  
+  document.addEventListener('mousemove', handleResizerMouseMove)
+  document.addEventListener('mouseup', handleResizerMouseUp)
+}
+
+const handleResizerMouseMove = (event) => {
+  if (!isResizing.value || !resizerData.value.element) return
+  
+  const { startX, startWidths, leftColumn, rightColumn, resizerIndex } = resizerData.value
+  const deltaX = event.clientX - startX
+  
+  // Calculate new widths
+  const leftWidth = Math.max(100, startWidths[resizerIndex - 1] + deltaX)
+  const rightWidth = Math.max(100, startWidths[resizerIndex] - deltaX)
+  
+  // Apply new widths
+  leftColumn.style.width = leftWidth + 'px'
+  leftColumn.style.flexBasis = leftWidth + 'px'
+  leftColumn.style.flexGrow = '0'
+  leftColumn.style.flexShrink = '0'
+  
+  rightColumn.style.width = rightWidth + 'px'
+  rightColumn.style.flexBasis = rightWidth + 'px'
+  rightColumn.style.flexGrow = '0'
+  rightColumn.style.flexShrink = '0'
+}
+
+const handleResizerMouseUp = () => {
+  if (!isResizing.value) return
+  
+  isResizing.value = false
+  
+  // Remove visual feedback classes
+  const { element: resizer, columnContainer } = resizerData.value
+  if (resizer) {
+    resizer.classList.remove('resizing')
+  }
+  if (columnContainer) {
+    columnContainer.classList.remove('is-resizing')
+  }
+  
+  // Save the new widths to the node attributes
+  const columns = Array.from(columnContainer.children).filter(el => !el.classList.contains('column-resizer'))
+  const newWidths = columns.map(col => col.offsetWidth)
+  
+  // Update the TipTap node with new widths
+  if (editor.value) {
+    const { state, view } = editor.value
+    const pos = view.posAtDOM(columnContainer, 0)
+    if (pos !== null && pos !== undefined) {
+      const resolvedPos = state.doc.resolve(pos)
+      const node = resolvedPos.parent
+      
+      if (node && node.type.name === 'columns') {
+        const tr = state.tr.setNodeMarkup(resolvedPos.pos - resolvedPos.parentOffset - 1, undefined, {
+          ...node.attrs,
+          columnWidths: newWidths
+        })
+        view.dispatch(tr)
+      }
+    }
+  }
+  
+  document.removeEventListener('mousemove', handleResizerMouseMove)
+  document.removeEventListener('mouseup', handleResizerMouseUp)
+  
+  resizerData.value = { element: null, startX: 0, startWidths: [] }
+}
+
 onMounted(() => {
   // Convert page blocks to TipTap content if they exist
   let initialContent = '<p></p>' // Default empty paragraph
@@ -476,10 +1051,15 @@ onMounted(() => {
           hideSlashMenu()
         }
       }
+      
+      // Initialize resizers for any new columns
+      initializeResizers()
     },
     
     onCreate: () => {
       console.log('📄 Document page editor created for:', props.page.title)
+      // Initialize resizers for any existing columns
+      initializeResizers()
     }
   })
 })
@@ -664,9 +1244,6 @@ watch(() => props.page, (newPage) => {
   margin: 0 0 1.25rem 0;
   align-items: flex-start;
   width: 100%;
-  max-width: 65rem;
-  margin-left: auto;
-  margin-right: auto;
   
   /* NO visible chrome - appears seamless */
   background: transparent;
@@ -682,6 +1259,58 @@ watch(() => props.page, (newPage) => {
 
 :deep(.paper-columns > p) {
   margin: 0 0 1.25rem 0;
+}
+
+/**
+ * INVISIBLE COLUMN RESIZERS
+ * Hidden by default, visible on hover, draggable to resize columns
+ */
+:deep(.column-resizer) {
+  position: relative;
+  width: 8px;
+  margin: 0 -4px;
+  cursor: col-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+  
+  /* Create the visual resizer line */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    bottom: 0;
+    width: 1px;
+    background-color: #d1d5db;
+    transform: translateX(-50%);
+  }
+  
+  /* Hover state - slightly more visible */
+  &:hover::after {
+    background-color: #9ca3af;
+    width: 2px;
+  }
+}
+
+/* Show resizers when parent is hovered */
+:deep(.paper-columns:hover .column-resizer) {
+  opacity: 1;
+}
+
+/* Keep resizers visible during drag */
+:deep(.paper-columns .column-resizer.resizing) {
+  opacity: 1;
+}
+
+/* Cursor feedback during resize */
+:deep(.paper-columns.is-resizing) {
+  cursor: col-resize;
+}
+
+:deep(.paper-columns.is-resizing *) {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 /**
