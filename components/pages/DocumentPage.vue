@@ -242,7 +242,7 @@ const InvisibleGridExtension = Extension.create({
             return true
         }
         
-        console.log('🎯 Shift+Tab pressed - attempting to add block to column')
+        console.log('🎯 Shift+Tab pressed - simplified proximity-based logic')
         
         // Not in columns - check if current block is a paragraph
         const currentParagraph = $from.parent
@@ -262,7 +262,7 @@ const InvisibleGridExtension = Extension.create({
           end: currentEnd
         })
         
-        // Find previous block
+        // Find the immediately preceding block (proximity-based approach)
         let prevBlock = null
         let prevBlockPos = null
         
@@ -288,72 +288,35 @@ const InvisibleGridExtension = Extension.create({
         }
         
         if (!prevBlock || prevBlockPos === null) {
-          // No previous block - create a new empty block and make columns
-          console.log('➕ No previous block found - creating new empty block for columns')
-          
-          const emptyParagraph = state.schema.nodes.paragraph.create()
-          const columnsContent = [
-            state.schema.nodes.paragraph.create({}, currentParagraph.content),
-            emptyParagraph
-          ]
-          
-          const newColumnsNode = state.schema.nodes.columns.create({}, columnsContent)
-          
-          // Replace current paragraph with the new columns
-          const tr = state.tr.replaceWith(currentStart, currentEnd, newColumnsNode)
-          
-          // Position cursor in the second (empty) column
-          const firstColumnSize = currentParagraph.nodeSize
-          const newCursorPos = currentStart + 1 + firstColumnSize + 1
-          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
-          
-          view.dispatch(tr)
-          
-          // Debug: Check the created structure
-          setTimeout(() => {
-            console.log('🔍 Checking created columns structure...')
-            const columnsElements = document.querySelectorAll('.paper-columns')
-            console.log('Found', columnsElements.length, 'column containers')
-            columnsElements.forEach((container, index) => {
-              console.log(`Container ${index}:`, container)
-              console.log('Children:', Array.from(container.children).map(child => child.tagName))
-            })
-          }, 100)
-          
-          console.log('✅ Created new columns with empty block + current block')
+          console.log('❌ No previous block found - cannot create columns')
           return true
         }
         
-        console.log('✅ Found previous block:', {
+        console.log('✅ Found immediately preceding block:', {
           type: prevBlock.type.name,
           content: prevBlock.type.name === 'paragraph' ? prevBlock.textContent : 'columns'
         })
         
         let newColumnsNode
+        let replaceStart
+        let replaceEnd
         
-        if (prevBlock.type.name === 'columns') {
-          // Check if we just exited from columns - if so, don't create new columns
-          console.log('🔍 Previous block is columns - checking if we should add to it or skip')
+        if (prevBlock.type.name === 'paragraph') {
+          // Simple case: Create new two-column group [prev_text | current_text]
+          console.log('📝 Creating new two-column group: [prev_text | current_text]')
           
-          // Look for the block before the columns to see the pattern
-          let blockBeforeColumns = null
-          if (prevIndex > 0) {
-            parent.forEach((child, offset, index) => {
-              if (index === prevIndex - 1) {
-                blockBeforeColumns = child
-              }
-            })
-          }
+          const columnsContent = [
+            state.schema.nodes.paragraph.create({}, prevBlock.content),
+            state.schema.nodes.paragraph.create({}, currentParagraph.content)
+          ]
           
-          // If there's a pattern of: columns -> paragraph -> current, don't create columns
-          // This suggests the user exited columns with Enter, so don't auto-create new ones
-          if (blockBeforeColumns && blockBeforeColumns.type.name === 'columns') {
-            console.log('📋 Detected pattern: columns -> paragraph -> current. Skipping column creation.')
-            return true
-          }
+          newColumnsNode = state.schema.nodes.columns.create({}, columnsContent)
+          replaceStart = prevBlockPos
+          replaceEnd = currentEnd
           
-          // Otherwise, add to existing columns
-          console.log('🧩 Adding to existing columns group')
+        } else if (prevBlock.type.name === 'columns') {
+          // Add to existing columns: [col1 | col2 | current_text]
+          console.log('🧩 Adding to existing columns group: [col1 | col2 | current_text]')
           
           const existingColumns = []
           prevBlock.forEach(child => {
@@ -364,48 +327,30 @@ const InvisibleGridExtension = Extension.create({
           existingColumns.push(state.schema.nodes.paragraph.create({}, currentParagraph.content))
           
           newColumnsNode = state.schema.nodes.columns.create({}, existingColumns)
+          replaceStart = prevBlockPos
+          replaceEnd = currentEnd
           
-        } else if (prevBlock.type.name === 'paragraph') {
-          // Create new columns with both blocks
-          console.log('🔧 Creating new columns with both blocks')
-          
-          const columnsContent = [
-            state.schema.nodes.paragraph.create({}, prevBlock.content),
-            state.schema.nodes.paragraph.create({}, currentParagraph.content)
-          ]
-          
-          newColumnsNode = state.schema.nodes.columns.create({}, columnsContent)
         } else {
-          console.log('❌ Cannot create columns with this block type')
+          console.log('❌ Cannot create columns with block type:', prevBlock.type.name)
           return true
         }
         
-        if (!newColumnsNode) {
-          console.log('❌ Could not create columns node')
-          return true // Return true to prevent default browser behavior
-        }
-        
-        // Replace both blocks with the new columns node
-        const replaceStart = prevBlockPos
-        const replaceEnd = currentEnd
-        
+        // Replace blocks with the new columns node
         console.log('Replacing from', replaceStart, 'to', replaceEnd)
         
         const tr = state.tr.replaceWith(replaceStart, replaceEnd, newColumnsNode)
         
-        // Position cursor in the second column (the one we just added)
-        // The structure is: columns > paragraph > text
-        // We need to get inside the second paragraph
+        // Position cursor in the last column (the one we just added)
         const columnsStart = replaceStart
         let targetPos = columnsStart + 1 // Start of columns node
         
-        // Find the second paragraph position
+        // Find the last paragraph position
         let paragraphCount = 0
         newColumnsNode.descendants((node, pos) => {
           if (node.type.name === 'paragraph') {
             paragraphCount++
-            if (paragraphCount === 2) {
-              // This is the second paragraph (the one we just added)
+            if (paragraphCount === newColumnsNode.childCount) {
+              // This is the last paragraph (the one we just added)
               targetPos = columnsStart + pos + 1
               return false // Stop iterating
             }
@@ -419,36 +364,50 @@ const InvisibleGridExtension = Extension.create({
         
         console.log('✅ Block added to column successfully!')
         
-        // Debug: Check where cursor ended up (using setTimeout to let TipTap update)
-        setTimeout(() => {
-          // 'editor' here is the parameter from the keyboard shortcut, not the ref
-          const newState = editor.state
-          const newSelection = newState.selection
-          const $newFrom = newSelection.$from
-          console.log('📍 Cursor position after column creation:')
-          for (let i = 0; i <= $newFrom.depth; i++) {
-            const node = $newFrom.node(i)
-            console.log(`  Level ${i}:`, node.type.name)
-          }
-        }, 10)
-        
         return true
       },
       
-      // Enter key behavior - create new paragraph WITHIN column
+      // Enter key behavior - create new paragraph WITHIN current column
       'Enter': ({ editor }) => {
         const { state } = editor
         const { selection } = state
         const { $from } = selection
         
-        console.log('↵ Enter pressed - checking context')
-        console.log('Current depth:', $from.depth)
+        console.log('↵ Enter pressed - checking if we are in columns')
+        
+        // Check if we're inside columns
+        let inColumns = false
+        let columnsDepth = null
+        
         for (let i = 0; i <= $from.depth; i++) {
           const node = $from.node(i)
-          console.log(`Level ${i}: ${node.type.name}`)
+          if (node.type.name === 'columns') {
+            inColumns = true
+            columnsDepth = i
+            console.log('✅ Found columns at level:', i)
+            break
+          }
         }
         
-        // Check if we're inside columns - if so, exit them
+        if (inColumns) {
+          console.log('📝 Enter pressed within column - creating new paragraph within current column')
+          // Use default Enter behavior to create new paragraph within the column
+          return false
+        }
+        
+        console.log('ℹ️ Not in columns - using default Enter behavior')
+        return false // Use default behavior for non-column contexts
+      },
+      
+      // Shift+Enter - EXIT columns completely and create new paragraph below
+      'Shift-Enter': ({ editor }) => {
+        const { state, view } = editor
+        const { selection } = state
+        const { $from } = selection
+        
+        console.log('⏎ Shift+Enter pressed - escape hatch to exit columns')
+        
+        // Check if we're inside columns
         let inColumns = false
         let columnsNode = null
         let columnsDepth = null
@@ -465,81 +424,7 @@ const InvisibleGridExtension = Extension.create({
         }
         
         if (inColumns && columnsNode && columnsDepth !== null) {
-          console.log('🚪 Enter pressed within column - exiting to create new paragraph below')
-          
-          // Calculate the position of the columns node
-          const columnsPos = $from.before(columnsDepth)
-          const columnsEnd = columnsPos + columnsNode.nodeSize
-          
-          console.log('Columns info:', {
-            depth: columnsDepth,
-            start: columnsPos,
-            end: columnsEnd,
-            nodeSize: columnsNode.nodeSize
-          })
-          
-          // Create new paragraph after the columns
-          const newParagraph = state.schema.nodes.paragraph.create()
-          
-          // Insert the new paragraph after columns and position cursor there
-          const tr = state.tr.insert(columnsEnd, newParagraph)
-          
-          // Set cursor in the new paragraph
-          const newCursorPos = columnsEnd + 1
-          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
-          
-          editor.view.dispatch(tr)
-          return true
-        }
-        
-        console.log('ℹ️ Not in columns - using default Enter behavior')
-        return false // Use default behavior for non-column contexts
-      },
-      
-      // Shift+Enter - EXIT columns and create new paragraph below
-      'Shift-Enter': ({ editor }) => {
-        const { state, view } = editor
-        const { selection } = state
-        const { $from } = selection
-        
-        console.log('⏎ Shift+Enter pressed - checking if we need to exit columns')
-        console.log('Current depth:', $from.depth)
-        
-        // Debug: Show the complete node hierarchy
-        for (let i = 0; i <= $from.depth; i++) {
-          const node = $from.node(i)
-          console.log(`Level ${i}:`, node.type.name)
-        }
-        
-        // Check if parent or grandparent is columns
-        let inColumns = false
-        let columnsNode = null
-        let columnsDepth = null
-        
-        // Check parent first (when cursor is in a paragraph inside columns)
-        if ($from.depth >= 1) {
-          const parent = $from.node(1)
-          console.log('Parent node type:', parent.type.name)
-          if (parent.type.name === 'columns') {
-            inColumns = true
-            columnsNode = parent
-            columnsDepth = 1
-          }
-        }
-        
-        // If still not found, check grandparent (in case of nested structure)
-        if (!inColumns && $from.depth >= 2) {
-          const grandparent = $from.node(2)
-          console.log('Grandparent node type:', grandparent.type.name)
-          if (grandparent.type.name === 'columns') {
-            inColumns = true
-            columnsNode = grandparent
-            columnsDepth = 2
-          }
-        }
-        
-        if (inColumns && columnsNode && columnsDepth !== null) {
-          console.log('🚪 Shift+Enter pressed within column - exiting to create new paragraph below')
+          console.log('🚪 Shift+Enter pressed within column - exiting to create full-width paragraph below')
           
           // Calculate the position of the columns node
           const columnsPos = $from.before(columnsDepth)
