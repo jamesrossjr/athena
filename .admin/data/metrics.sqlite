@@ -1,0 +1,2 @@
+-- This is a placeholder SQLite database file
+-- The actual database will be initialized by running: pnpm run admin:init

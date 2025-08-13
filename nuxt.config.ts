@@ -64,6 +64,8 @@ export default defineNuxtConfig({
       version: process.env.NUXT_PUBLIC_VERSION || '0.1.0',
       baseUrl: process.env.NUXT_PUBLIC_BASE_URL || 'http://localhost:3000',
       googleClientId: process.env.GOOGLE_CLIENT_ID,
+      supabaseUrl: process.env.SUPABASE_URL,
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
     }
   },
   

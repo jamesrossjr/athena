@@ -11,7 +11,7 @@
     
     <!-- Import Button -->
     <button
-      @click="openFileDialog"
+      @click="openFilewow "
       class="w-full flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
     >
       <div class="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">

@@ -1,0 +1,46 @@
+/**
+ * Global Workspace Middleware
+ * 
+ * Ensures users have selected a workspace before accessing
+ * the main application features.
+ */
+
+export default defineNuxtRouteMiddleware((to) => {
+  // Skip middleware for certain routes
+  const publicRoutes = ['/login', '/register', '/reset-password', '/auth']
+  const workspaceRoutes = ['/workspace-selector']
+  const apiRoutes = to.path.startsWith('/api/')
+  
+  if (publicRoutes.some(route => to.path.startsWith(route)) || 
+      workspaceRoutes.includes(to.path) || 
+      apiRoutes) {
+    return
+  }
+
+  // Only run on client side
+  if (process.client) {
+    const { hasWorkspace, initializeWorkspace } = useWorkspace()
+    
+    // Try to initialize workspace from storage
+    initializeWorkspace()
+    
+    // Check if workspace is selected
+    if (!hasWorkspace.value) {
+      // Check if workspace ID is in query params
+      const workspaceId = to.query.workspace as string
+      
+      if (workspaceId) {
+        // Try to load the workspace
+        const { loadWorkspace } = useWorkspace()
+        
+        loadWorkspace(workspaceId).catch(() => {
+          // If loading fails, redirect to workspace selector
+          return navigateTo('/workspace-selector')
+        })
+      } else {
+        // No workspace selected, redirect to selector
+        return navigateTo('/workspace-selector')
+      }
+    }
+  }
+})

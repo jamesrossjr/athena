@@ -4,8 +4,8 @@ export const useSupabase = () => {
   const config = useRuntimeConfig()
   
   const supabase = createClient(
-    config.supabaseUrl || '',
-    config.supabaseAnonKey || ''
+    config.public.supabaseUrl || '',
+    config.public.supabaseAnonKey || ''
   )
   
   return { supabase }

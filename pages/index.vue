@@ -14,9 +14,9 @@
 <script setup lang="ts">
 import WelcomeScreen from '~/components/WelcomeScreen.vue'
 
-// Use global state from app.vue
-const globalState = inject('globalCommandPalette')
-const hasActiveWorkspace = globalState?.hasActiveWorkspace || computed(() => false)
+// Use workspace composable directly
+const { hasWorkspace, currentWorkspace } = useWorkspace()
+const hasActiveWorkspace = computed(() => hasWorkspace.value)
 
 // Test function to bypass CommandPalette issues
 const testPageCreation = async () => {

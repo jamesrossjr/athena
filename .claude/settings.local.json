@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx nuxi typecheck)",
+      "Bash(mkdir:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(find:*)",
+      "Bash(npx prisma:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "WebSearch",
+      "Bash(rm:*)",
+      "Bash(curl:*)"
+    ],
+    "deny": []
+  }
+}

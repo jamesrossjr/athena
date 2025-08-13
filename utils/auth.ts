@@ -1,6 +1,8 @@
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 import { randomBytes } from 'crypto'
+import { PrismaClient } from '@prisma/client'
+import type { H3Event } from 'h3'
 
 interface JWTPayload {
   userId: string
@@ -107,5 +109,77 @@ export class AuthUtils {
     const now = new Date()
     // 1 hour for password reset tokens
     return new Date(now.getTime() + 60 * 60 * 1000)
+  }
+}
+
+const prisma = new PrismaClient()
+
+export interface UserSession {
+  user: {
+    id: string
+    email: string
+    firstName: string
+    lastName: string
+  }
+  session: {
+    id: string
+    token: string
+    expiresAt: Date
+  }
+}
+
+export async function requireUserSession(event: H3Event): Promise<UserSession> {
+  // Get session token from cookie
+  const token = getCookie(event, 'auth-token')
+  
+  if (!token) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'No session token provided'
+    })
+  }
+
+  // Find session in database
+  const session = await prisma.session.findUnique({
+    where: { token },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true
+        }
+      }
+    }
+  })
+
+  if (!session) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Invalid session token'
+    })
+  }
+
+  // Check if session is expired
+  if (session.expiresAt < new Date()) {
+    // Clean up expired session
+    await prisma.session.delete({
+      where: { id: session.id }
+    })
+    
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Session expired'
+    })
+  }
+
+  return {
+    user: session.user,
+    session: {
+      id: session.id,
+      token: session.token,
+      expiresAt: session.expiresAt
+    }
   }
 }

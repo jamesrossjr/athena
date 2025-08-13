@@ -1,0 +1,65 @@
+{
+  "project": {
+    "root": "..",
+    "src": "../",
+    "components": "../components",
+    "composables": "../composables",
+    "pages": "../pages",
+    "server": "../server",
+    "types": "../types",
+    "public": "../public",
+    "assets": "../assets"
+  },
+  "features": {
+    "blocks": "../components/blocks",
+    "commandPalette": "../components/CommandPalette.vue",
+    "pages": "../components/pages",
+    "editor": "../components/editor"
+  },
+  "services": {
+    "root": "../services",
+    "ai": "../services/ai",
+    "database": "../services/database",
+    "auth": "../utils/auth.ts"
+  },
+  "database": {
+    "prisma": "../prisma",
+    "schema": "../prisma/schema.prisma",
+    "migrations": "../prisma/migrations",
+    "seed": "../prisma/seed.ts"
+  },
+  "config": {
+    "nuxt": "../nuxt.config.ts",
+    "tailwind": "../tailwind.config.js",
+    "tsconfig": "../tsconfig.json",
+    "package": "../package.json"
+  },
+  "build": {
+    "output": "../.output",
+    "dist": "../dist",
+    "cache": "../.nuxt"
+  },
+  "admin": {
+    "root": ".",
+    "ai": "./ai",
+    "prompts": "./ai/prompts",
+    "schemas": "./ai/schemas",
+    "scripts": "./scripts",
+    "templates": "./templates",
+    "data": "./data",
+    "lib": "./lib",
+    "workflows": "./workflows"
+  },
+  "docs": {
+    "root": "../docs",
+    "api": "../docs/api",
+    "components": "../docs/components",
+    "guides": "../docs/guides"
+  },
+  "tests": {
+    "unit": "../tests/unit",
+    "integration": "../tests/integration",
+    "e2e": "../tests/e2e",
+    "fixtures": "../tests/fixtures"
+  }
+}

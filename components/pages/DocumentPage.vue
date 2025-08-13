@@ -373,11 +373,16 @@ const InvisibleGridExtension = Extension.create({
         const contextName = parentContainer.type.name === 'doc' ? 'document' : 'column'
         console.log(`✅ Created nested columns within ${contextName} and positioned cursor at beginning of moved block`)
         return true
-        }
       },
       
       // Enter: Create new paragraph within current column (natural flow)
       'Enter': ({ editor }) => {
+        // Layout Brush Mode: Arrange selected blocks into columns
+        if (layoutBrushMode.value && selectedBlocks.value.length >= 2) {
+          arrangeSelectedIntoColumns()
+          return true
+        }
+        
         const { state } = editor
         const { selection } = state
         const { $from } = selection
@@ -510,14 +515,6 @@ const InvisibleGridExtension = Extension.create({
       'Escape': () => {
         if (layoutBrushMode.value) {
           exitLayoutBrush()
-          return true
-        }
-        return false
-      },
-      
-      'Enter': ({ editor }) => {
-        if (layoutBrushMode.value && selectedBlocks.value.length >= 2) {
-          arrangeSelectedIntoColumns()
           return true
         }
         return false
@@ -1631,7 +1628,7 @@ watch(() => props.page, (newPage) => {
   }
   
   .slash-menu {
-    display: none;
+    min-width: 160px;
   }
 }
 </style>

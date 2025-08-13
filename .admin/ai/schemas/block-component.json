@@ -1,0 +1,307 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TipTap Block Component Schema",
+  "description": "Schema for AI-generated TipTap block components",
+  "type": "object",
+  "required": ["component", "extension", "types"],
+  "properties": {
+    "component": {
+      "type": "object",
+      "description": "Vue component definition",
+      "required": ["name", "template", "script", "style"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][a-zA-Z0-9]*Block$",
+          "description": "Component name in PascalCase ending with 'Block'"
+        },
+        "template": {
+          "type": "string",
+          "description": "Vue template section"
+        },
+        "script": {
+          "type": "string",
+          "description": "Vue script section with TypeScript"
+        },
+        "style": {
+          "type": "string",
+          "description": "Vue style section with scoped styles"
+        },
+        "props": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["string", "number", "boolean", "object", "array"]
+              },
+              "required": {
+                "type": "boolean",
+                "default": false
+              },
+              "default": {
+                "description": "Default value for the prop"
+              }
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "payload"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "payload": {
+                "type": "string",
+                "description": "TypeScript type for event payload"
+              }
+            }
+          }
+        }
+      }
+    },
+    "extension": {
+      "type": "object",
+      "description": "TipTap extension definition",
+      "required": ["name", "type", "group", "attributes"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9]*$",
+          "description": "Extension name in camelCase"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["node", "mark"],
+          "description": "TipTap extension type"
+        },
+        "group": {
+          "type": "string",
+          "enum": ["block", "inline"],
+          "description": "Content group"
+        },
+        "content": {
+          "type": "string",
+          "description": "Content expression (e.g., 'inline*', 'block+')"
+        },
+        "attributes": {
+          "type": "object",
+          "description": "Node/mark attributes",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["default"],
+            "properties": {
+              "default": {
+                "description": "Default value"
+              },
+              "parseHTML": {
+                "type": "string",
+                "description": "HTML parsing logic"
+              },
+              "renderHTML": {
+                "type": "string",
+                "description": "HTML rendering logic"
+              }
+            }
+          }
+        },
+        "parseHTML": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "class": {
+                "type": "string"
+              },
+              "attrs": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "renderHTML": {
+          "type": "string",
+          "description": "HTML rendering function"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "implementation"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "implementation": {
+                "type": "string",
+                "description": "Command implementation code"
+              }
+            }
+          }
+        }
+      }
+    },
+    "types": {
+      "type": "object",
+      "description": "TypeScript type definitions",
+      "required": ["interfaces"],
+      "properties": {
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "properties"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Z][a-zA-Z0-9]*$"
+              },
+              "properties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "type"],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "optional": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "enums": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "values"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "description": "Unit test specification",
+      "properties": {
+        "framework": {
+          "type": "string",
+          "enum": ["vitest", "jest"],
+          "default": "vitest"
+        },
+        "testCases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["description", "test"],
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "test": {
+                "type": "string",
+                "description": "Test implementation code"
+              },
+              "setup": {
+                "type": "string",
+                "description": "Test setup code"
+              }
+            }
+          }
+        }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "description": "Component documentation",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "usage": {
+          "type": "string",
+          "description": "Usage examples"
+        },
+        "props": {
+          "type": "string",
+          "description": "Props documentation"
+        },
+        "events": {
+          "type": "string",
+          "description": "Events documentation"
+        }
+      }
+    },
+    "integration": {
+      "type": "object",
+      "description": "Integration requirements",
+      "properties": {
+        "commandPalette": {
+          "type": "object",
+          "properties": {
+            "commands": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "label"],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "shortcut": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "universalLinking": {
+          "type": "boolean",
+          "description": "Whether block supports universal linking"
+        },
+        "polymorphicPages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["DOCUMENT", "DATABASE", "WHITEBOARD", "IDE", "KANBAN", "CALENDAR"]
+          },
+          "description": "Page types where block can be used"
+        }
+      }
+    }
+  }
+}

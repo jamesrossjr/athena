@@ -24,7 +24,7 @@ model User {
   sessions       Session[]
   passwordResets PasswordReset[]
   socialAccounts SocialAccount[]
-  documents      Document[]
+  pages          Page[]
   workspaces     Workspace[]
   
   @@map("users")
@@ -74,31 +74,83 @@ model SocialAccount {
   @@map("social_accounts")
 }
 
-model Document {
+// Unified Data Layer - Every piece of content is a record
+model Page {
   id          String   @id @default(cuid())
   userId      String
-  workspaceId String?
+  workspaceId String
   title       String
-  type        String   // "text", "pdf", "image", etc.
-  content     String?  // For text-based documents
-  filePath    String?  // Secure reference to file location
-  fileData    Bytes?   // Optional: store file data directly
-  fileName    String?  // Original file name
-  fileSize    Int?     // File size in bytes
-  mimeType    String?  // MIME type for the file
-  metadata    Json?    // Additional metadata (pages, dimensions, etc.)
-  links       String[] @default([]) // IDs of documents this document links to
-  backlinks   String[] @default([]) // IDs of documents that link to this document
+  type        String   // "DOCUMENT", "DATABASE", "WHITEBOARD", "IDE", "CALENDAR", "KANBAN"
+  icon        String?  // Icon for the page
+  properties  Json?    // Page-specific properties (schema for DB, canvas settings for whiteboard, etc)
+  metadata    Json?    // Additional metadata
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   // Relations
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  blocks       Block[]
+  sourceLinks  Link[]       @relation("SourcePage")
+  targetLinks  Link[]       @relation("TargetPage")
   
   @@index([userId, type])
   @@index([workspaceId])
-  @@map("documents")
+  @@index([type])
+  @@map("pages")
+}
+
+// Individual content blocks - the atomic units of the knowledge graph
+model Block {
+  id        String   @id @default(cuid())
+  pageId    String
+  parentId  String?  // For nested blocks (indentation, lists, etc)
+  type      String   // "TEXT", "HEADING", "LIST", "TODO", "CODE", "IMAGE", "EMBED", "TABLE_ROW", etc
+  content   Json     // Block-specific content structure
+  position  Int      // Position within parent/page
+  metadata  Json?    // Block-specific metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations  
+  page         Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  parent       Block?  @relation("BlockHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Block[] @relation("BlockHierarchy")
+  sourceLinks  Link[]  @relation("SourceBlock")
+  targetLinks  Link[]  @relation("TargetBlock")
+  
+  @@index([pageId])
+  @@index([parentId])
+  @@index([type])
+  @@index([pageId, position])
+  @@map("blocks")
+}
+
+// Universal linking system - connects any content to any other content
+model Link {
+  id              String   @id @default(cuid())
+  sourceType      String   // "PAGE" or "BLOCK"
+  sourcePageId    String?  // If linking from a page
+  sourceBlockId   String?  // If linking from a block
+  targetType      String   // "PAGE" or "BLOCK"
+  targetPageId    String?  // If linking to a page
+  targetBlockId   String?  // If linking to a block
+  linkType        String   @default("REFERENCE") // "REFERENCE", "EMBED", "MENTION", "ALIAS"
+  metadata        Json?    // Link-specific data (anchor text, context, etc)
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  sourcePage   Page?  @relation("SourcePage", fields: [sourcePageId], references: [id], onDelete: Cascade)
+  targetPage   Page?  @relation("TargetPage", fields: [targetPageId], references: [id], onDelete: Cascade)  
+  sourceBlock  Block? @relation("SourceBlock", fields: [sourceBlockId], references: [id], onDelete: Cascade)
+  targetBlock  Block? @relation("TargetBlock", fields: [targetBlockId], references: [id], onDelete: Cascade)
+  
+  @@index([sourcePageId])
+  @@index([sourceBlockId])
+  @@index([targetPageId])
+  @@index([targetBlockId])
+  @@index([linkType])
+  @@map("links")
 }
 
 model Workspace {
@@ -113,7 +165,7 @@ model Workspace {
   
   // Relations
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents Document[]
+  pages     Page[]
   templates Template[]
   
   @@index([userId])

@@ -1,0 +1,109 @@
+{
+  "project": {
+    "name": "Athena",
+    "version": "1.0.0",
+    "author": "James",
+    "description": "Hyper-minimalist knowledge management system"
+  },
+  "ai": {
+    "defaultProvider": "ollama",
+    "providers": {
+      "ollama": {
+        "enabled": true,
+        "baseUrl": "http://localhost:11434",
+        "model": "codellama",
+        "temperature": 0.7,
+        "maxTokens": 4096
+      },
+      "openai": {
+        "enabled": false,
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "maxTokens": 4096
+      },
+      "anthropic": {
+        "enabled": false,
+        "model": "claude-3-opus",
+        "temperature": 0.7,
+        "maxTokens": 4096
+      }
+    },
+    "generation": {
+      "validateOutput": true,
+      "retryAttempts": 3,
+      "timeout": 30000
+    }
+  },
+  "database": {
+    "provider": "sqlite",
+    "autoMigrate": true,
+    "seedOnInit": false,
+    "backupEnabled": true,
+    "backupSchedule": "daily"
+  },
+  "development": {
+    "port": 3004,
+    "host": "localhost",
+    "hotReload": true,
+    "autoOpenBrowser": true,
+    "verboseLogging": false
+  },
+  "testing": {
+    "coverage": {
+      "enabled": true,
+      "threshold": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    },
+    "parallelJobs": 4,
+    "timeout": 10000
+  },
+  "generation": {
+    "templates": {
+      "useTypeScript": true,
+      "useCompositionApi": true,
+      "generateTests": true,
+      "generateDocs": true
+    },
+    "naming": {
+      "components": "PascalCase",
+      "composables": "camelCase",
+      "files": "kebab-case"
+    }
+  },
+  "metrics": {
+    "enabled": true,
+    "collectInterval": 3600000,
+    "lighthouse": {
+      "enabled": true,
+      "categories": ["performance", "accessibility", "best-practices", "seo"]
+    },
+    "tracking": {
+      "aiUsage": true,
+      "buildTimes": true,
+      "testCoverage": true,
+      "errorRates": true
+    }
+  },
+  "workflows": {
+    "autoCommit": false,
+    "preLaunchChecks": true,
+    "continuousDeployment": false,
+    "notificationEmail": null
+  },
+  "security": {
+    "enableAudit": true,
+    "scanDependencies": true,
+    "enforceHttps": true,
+    "cspEnabled": true
+  },
+  "output": {
+    "colors": true,
+    "timestamps": true,
+    "logLevel": "info",
+    "clearOnRun": false
+  }
+}
