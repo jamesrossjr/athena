@@ -3,6 +3,7 @@ import Fuse from 'fuse.js'
 export const useCommandPaletteStore = defineStore('commandPalette', () => {
   const isOpen = ref(false)
   const searchQuery = ref('')
+  const currentNamespace = ref('')
   const commands = ref([
     // Navigation Commands
     { id: 1, label: 'Create New Document', icon: 'i-heroicons-document-plus', action: 'create-document' },
@@ -28,15 +29,42 @@ export const useCommandPaletteStore = defineStore('commandPalette', () => {
     { id: 21, label: 'View Document History', icon: 'i-heroicons-clock', action: 'document-history' },
   ])
 
-  const fuse = new Fuse(commands.value, { keys: ['label'] })
+  const fuse = new Fuse(commands.value, { 
+    keys: ['label', 'action'],
+    threshold: 0.4,
+    includeScore: true
+  })
 
   const filteredCommands = computed(() => {
     if (!searchQuery.value) return commands.value
-    return fuse.search(searchQuery.value).map(result => result.item)
+    return fuse.search(searchQuery.value)
+      .filter(result => (result.score || 0) < 0.8)
+      .map(result => result.item)
   })
 
-  function open() { isOpen.value = true }
-  function close() { isOpen.value = false }
+  function open() { 
+    isOpen.value = true 
+    searchQuery.value = ''
+  }
+  
+  function close() { 
+    isOpen.value = false 
+    searchQuery.value = ''
+    currentNamespace.value = ''
+  }
 
-  return { isOpen, commands, filteredCommands, searchQuery, open, close }
+  function setNamespace(namespace: string) {
+    currentNamespace.value = namespace
+  }
+
+  return { 
+    isOpen, 
+    commands, 
+    filteredCommands, 
+    searchQuery, 
+    currentNamespace,
+    open, 
+    close,
+    setNamespace
+  }
 })

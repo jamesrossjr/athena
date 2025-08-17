@@ -1,13 +1,26 @@
 {
-  "name": "nuxt-app",
+  "name": "athena",
+  "version": "0.1.0",
+  "description": "Athena - Next-Generation Collaborative Workspace",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "dev:host": "HOST=0.0.0.0 nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "echo 'Linting not configured yet'",
+    "test": "echo 'Testing not configured yet'",
+    "docker:build": "docker build -t athena .",
+    "docker:run": "docker run -p 3000:3000 athena"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.15",
