@@ -1,0 +1,241 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String              @id @default(cuid())
+  email         String              @unique
+  password      String
+  name          String?
+  avatar        String?
+  plan          UserPlan            @default(FREE)
+  stripeCustomerId String?
+  
+  // Workspace relationships
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  memberships     WorkspaceMember[]
+  
+  // AI and automation relationships
+  automationRules AutomationRule[]
+  suggestions     SmartSuggestion[]
+  briefings       DailyBriefing[]
+  
+  updatedAt     DateTime            @updatedAt
+  roles        Role[]
+}
+
+model Workspace {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  plan        WorkspacePlan       @default(TEAM)
+  
+  // Owner relationship
+  owner       User                @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  ownerId     String
+  
+  // Members and documents
+  members     WorkspaceMember[]
+  plugins      Plugin[]
+  documents   Document[]
+  
+  // Automation
+  automationRules AutomationRule[]
+  
+  // Billing
+  stripeSubscriptionId String?
+  billingEmail String?
+  
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model WorkspaceMember {
+  id          String              @id @default(cuid())
+  
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  
+  role        WorkspaceRole       @default(MEMBER)
+  permissions String[]            // JSON array of specific permissions
+  
+  invitedBy   String?             // User ID who invited this member
+  invitedAt   DateTime            @default(now())
+  joinedAt    DateTime?
+  
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+enum UserPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum WorkspacePlan {
+  TEAM
+  BUSINESS
+  ENTERPRISE
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+model Document {
+  id          String      @id @default(cuid())
+  title       String
+  type        DocumentType
+  content     Json?
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id])
+  workspaceId String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+enum DocumentType {
+  PAGE
+  WHITEBOARD
+  DATABASE
+}
+
+model AutomationRule {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  enabled       Boolean   @default(true)
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId   String
+  
+  // Stored as JSON
+  trigger       Json
+  conditions    Json?
+  actions       Json
+  settings      Json      @default("{}")
+  
+  // Execution tracking
+  executionCount    Int       @default(0)
+  lastExecutedAt    DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  executions    AutomationExecution[]
+  
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([enabled])
+}
+
+model AutomationExecution {
+  id            String    @id @default(cuid())
+  
+  rule          AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  ruleId        String
+  
+  status        ExecutionStatus @default(PENDING)
+  triggerData   Json
+  results       Json      @default("[]")
+  error         String?
+  
+  triggeredAt   DateTime  @default(now())
+  completedAt   DateTime?
+  
+  @@index([ruleId])
+  @@index([status])
+  @@index([triggeredAt])
+}
+
+model SmartSuggestion {
+  id            String    @id @default(cuid())
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  
+  type          String
+  title         String
+  description   String
+  confidence    Float
+  data          Json
+  actions       Json
+  
+  createdAt     DateTime  @default(now())
+  dismissedAt   DateTime?
+  acceptedAt    DateTime?
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@index([dismissedAt])
+}
+
+model DailyBriefing {
+  id            String    @id @default(cuid())
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  
+  date          DateTime
+  sections      Json
+  metrics       Json
+  generatedAt   DateTime  @default(now())
+  
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+ 
+model Plugin {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  version     String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+enum RoleName {
+  ADMIN
+  USER
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        RoleName
+  permissions Permission[]
+  users       User[]
+}
+
+model Permission {
+  id   String @id @default(cuid())
+  name String
+  roles Role[]
+}
