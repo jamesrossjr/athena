@@ -21,7 +21,9 @@
       "Bash(pnpm dev:*)",
       "Bash(pnpm vue-tsc:*)",
       "Bash(npx nuxt typecheck)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
